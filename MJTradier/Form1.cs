@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace MJTradier
@@ -14,39 +15,52 @@ namespace MJTradier
     {
     
         private const int BILLION = 100000000;
-        private const int MAX_STOCK_NUM = 1000000;  
-
-        EachStock[] eachStockArray = new EachStock[MAX_STOCK_NUM];  // 각 주식이 가지는 실시간용 구조체
+        private const int MAX_STOCK_NUM = 1000000;
+        private short eachStockIdx;
+        private short[] eachStockIdxArray = new short[MAX_STOCK_NUM];
+        EachStock[] eachStockArray;  // 각 주식이 가지는 실시간용 구조체
         EachStock curStock; 
 
-        private double stockFee = 0.0026;
         private int screenNum = 1000;
         private string strScreenNum;
         private string configurationPath = @"G:\getData\kiwoom\";
         private string[] kosdaqCodes;
         private string[] kospiCodes;
         public int nSepPerScreen = 100;
-        public bool marketStart;
+        public bool marketStart; // true면 장중, false면 장시작전 
+        public string accountNum; // 나의 계좌번호
         
+        public bool lockDeposit;  // 예수금 계산의 신뢰성을 보장하기 위해 lockDeposit이 false일때만 신규매수가 가능하게 했다.
+        public string lockCode; // 삭제예정/ 현재 매수가 진행 중인 종목코드
+        public int sharedTime; // 모든 종목들이 공유하는 현재시간
+        public Queue<TradeSlot> tradeQueue = new Queue<TradeSlot>(); // 모든 매매신청을 담는 큐
+        TradeSlot curSlot; // 임시로 사용하능한 매매신청 구조체변수
+
+        //// 얼마까지 살 수 있는 지를 확인하는 변수 모음
+        public int curDeposit;  // 햔제 예수금
+        public int ceilPrice;   // 총매수가능 상한가
+
+        /// ///////////////////////////////////////
+
+
         public Form1()
         {
             InitializeComponent(); // c# 고유 고정메소드  
 
-            SetRealStockMenu();
+            MappingFileToStockCodes();
             SubscribeRealData();
-            CheckTimer();  // 실시간 장시작시간 
+            
             loginToolStripMenuItem.Click += ToolStripMenuItem_Click;
             checkMyAccountInfoButton.Click += Button_Click;
-
 
             /////////// Event Handler 
             axKHOpenAPI1.OnEventConnect += OnEventConnectHandler; // 로그인 event slot connect
             axKHOpenAPI1.OnReceiveTrData += OnReceiveTrDataHandler; // TR event slot connect
             axKHOpenAPI1.OnReceiveRealData += OnReceiveRealDataHandler; // 실시간 event slot connect
-            axKHOpenAPI1.OnReceiveChejanData += OnReceiveChejanDataHandler; // 체결,접수 event slot connect
+            axKHOpenAPI1.OnReceiveChejanData += OnReceiveChejanDataHandler; // 체결,접수,잔고 event slot connect
             ////////////////////////////////////////////////////////
             ///
-
+           
         }
 
 
@@ -54,11 +68,13 @@ namespace MJTradier
         /*
          * 주식종목들을 특정 txt파일에서 읽어
          * 코스닥, 코스피 변수에 string[] 형식으로 각각 저장
+         * 코스닥, 코스피 종목갯수의 합만큼의 eachStockArray구조체 배열을 생성
          */
-        private void SetRealStockMenu()
+        private void MappingFileToStockCodes()
         {
             kosdaqCodes = System.IO.File.ReadAllLines(configurationPath + "today_kosdaq_stock_code.txt");
             kospiCodes = System.IO.File.ReadAllLines(configurationPath + "today_kospi_stock_code.txt");
+            eachStockArray = new EachStock[kosdaqCodes.Length + kospiCodes.Length];
         }
         
 
@@ -77,19 +93,25 @@ namespace MJTradier
             int kosdaqIterNum = kosdaqCodesLength / nSepPerScreen;
             int kosdaqRestNum = kosdaqCodesLength % nSepPerScreen;
             string strKosdaqCodeList;
+            const string sFID = "228"; // 체결강도. 실시간 목록 FID들 중 겹치는게 가장 적은 FID
 
+            // ------------------------------------------------------
+            // 코스피 실시간 등록
+            // ------------------------------------------------------
+            // 100개 단위
             for (int i = 0; i< kosdaqIterNum; i++)
             {
                 SetScreenNo();
                 strKosdaqCodeList = ConvertStrCodeList(kosdaqCodes, kosdaqIndex, kosdaqIndex + nSepPerScreen);
-                axKHOpenAPI1.SetRealReg(strScreenNum, strKosdaqCodeList, "228", "0");
+                axKHOpenAPI1.SetRealReg(strScreenNum, strKosdaqCodeList, sFID, "0");
                 kosdaqIndex += nSepPerScreen;
             }
+            // 나머지
             if (kosdaqRestNum > 0)
             {
                 SetScreenNo();
                 strKosdaqCodeList = ConvertStrCodeList(kosdaqCodes, kosdaqIndex, kosdaqIndex + kosdaqRestNum);
-                axKHOpenAPI1.SetRealReg(strScreenNum, strKosdaqCodeList, "228", "0");
+                axKHOpenAPI1.SetRealReg(strScreenNum, strKosdaqCodeList, sFID, "0");
             }
 
             int kospiIndex = 0;
@@ -98,18 +120,23 @@ namespace MJTradier
             int kospiRestNum = kospiCodesLength % nSepPerScreen;
             string strKospiCodeList;
 
+            // ------------------------------------------------------
+            // 코스닥 실시간 등록
+            // ------------------------------------------------------
+            // 100개 단위
             for (int i = 0; i < kospiIterNum; i++)
             {
                 SetScreenNo();
                 strKospiCodeList = ConvertStrCodeList(kospiCodes, kospiIndex, kospiIndex + nSepPerScreen);
-                axKHOpenAPI1.SetRealReg(strScreenNum, strKospiCodeList, "228", "0");
+                axKHOpenAPI1.SetRealReg(strScreenNum, strKospiCodeList, sFID, "0");
                 kospiIndex += nSepPerScreen;
             }
+            // 나머지
             if (kospiRestNum > 0)
             {
                 SetScreenNo();
                 strKospiCodeList = ConvertStrCodeList(kospiCodes, kospiIndex, kospiIndex + kospiRestNum);
-                axKHOpenAPI1.SetRealReg(strScreenNum, strKospiCodeList, "228", "0");
+                axKHOpenAPI1.SetRealReg(strScreenNum, strKospiCodeList, sFID, "0");
             }
         }
 
@@ -135,14 +162,20 @@ namespace MJTradier
             {
                 int codeIdx = int.Parse(codes[i]);
 
+                // TODO. Map(java) 기능과 속도 비교 후 수정 예정
+                ////// eachStockIdx 설정 부분 ///////
+                eachStockIdxArray[codeIdx] = eachStockIdx;
+                eachStockIdx++;
+                /////////////////////////////////////
+                
                 ////// eachStock 초기화 부분 //////////
-                curStock = eachStockArray[codeIdx];
+                curStock = eachStockArray[eachStockIdxArray[codeIdx]];
                 curStock.screenNum = strScreenNum;
                 curStock.code = codes[i];
                 curStock.initMode = true;
                 curStock.maxPower = -100.0;
                 //////////////////////////////////////
-                
+
                 strKosdaqCodeList += codes[i];
                 if (i < e - 1)
                     strKosdaqCodeList += ';';
@@ -152,16 +185,7 @@ namespace MJTradier
 
 
 
-        /*
-         * 장시작시간을 확인하기 위한 실시간데이터 요청
-         * 화면번호는 9000번 고정
-        */
-        public void CheckTimer()
-        {
-            axKHOpenAPI1.SetRealReg("9000", "", "214", "0");
-        }
-
-
+   
 
         /*
          * StripMenuItem을 이용해
@@ -201,6 +225,7 @@ namespace MJTradier
          */
         private void Button_Click(object sender, EventArgs e)
         {
+            // 예수금상세현황요청
             if (sender.Equals(checkMyAccountInfoButton))
             {
                 SetScreenNo();
@@ -222,6 +247,7 @@ namespace MJTradier
             if (e.sRQName.Equals("예수금상세현황요청"))
             {
                 int iMyDeposit = int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "예수금"));
+                curDeposit = iMyDeposit;
                 myDepositLabel.Text = iMyDeposit.ToString();
             }
         }
@@ -259,17 +285,96 @@ namespace MJTradier
         {
             if (e.sRealType.Equals("주식체결"))
             {
+
                 string code = e.sRealKey;
+
+                // -------------------------------------------------------------------------
+                // 체결 요청
+                // -------------------------------------------------------------------------
+                // 매매컨트롤러 부분은 Async를 사용하려 했는데
+                // 오버헤드가 클거같아서 실시간 부분에 끼워넣었다.
+                if (tradeQueue.Count > 0)
+                {
+                    // 큐에서 하나 빼내 
+                    
+                    curSlot = tradeQueue.Peek();
+
+                      
+                    if (SubTimeToTime(sharedTime, curSlot.nRqTime) <= 2) // 요청 시간 - 현재시간 < 2초
+                    {
+                        if (curSlot.nOrderType == 1) // 신규매수
+                        {
+                            if (!lockDeposit)
+                            {
+                                if (curSlot.sHogaGb.Equals("00")) // 지정가
+                                {
+                                    
+                                }
+                                else if (curSlot.sHogaGb.Equals("03")) // 시장가
+                                {
+                                    lockCode = code; // 삭제예정
+                                    lockDeposit = true;
+                                    axKHOpenAPI1.SendOrder(curSlot.sRQName, curSlot.sScreenNo, curSlot.sAccNo, 
+                                        curSlot.nOrderType, curSlot.sCode, curSlot.nQty, curSlot.nPrice,
+                                        curSlot.sHogaGb, curSlot.sOrgOrderNo);
+                                }
+                                tradeQueue.Dequeue();
+                            }
+                        }
+                        else
+                        {
+                            tradeQueue.Dequeue();
+                            axKHOpenAPI1.SendOrder(curSlot.sRQName, curSlot.sScreenNo, curSlot.sAccNo,
+                                        curSlot.nOrderType, curSlot.sCode, curSlot.nQty, curSlot.nPrice,
+                                        curSlot.sHogaGb, curSlot.sOrgOrderNo);
+
+                            if (curSlot.nOrderType == 2) // 신규매도
+                            {
+
+                            }
+                            else if (curSlot.nOrderType == 3) // 매수취소
+                            {
+
+                            }
+                            else if (curSlot.nOrderType == 4) // 매도취소
+                            {
+
+                            }
+                            else if (curSlot.nOrderType == 5) // 매수정정
+                            {
+
+                            }
+                            else if (curSlot.nOrderType == 6) // 매도정정
+                            {
+
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 처분
+                        tradeQueue.Dequeue();
+                    }
+                    
+                }
+
+                // -------------------------------------------------------------------------
+                // 실시간 데이터 처리
+                // -------------------------------------------------------------------------
+
                 int codeIdx = int.Parse(code);
-                curStock = eachStockArray[codeIdx];
+                curStock = eachStockArray[eachStockIdxArray[codeIdx]];
 
                 if (!marketStart || curStock.passMode)
                     return;
 
-                curStock.time = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(code, 20))); // 현재시간
+
+                curStock.time = sharedTime = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(code, 20))); // 현재시간
                 curStock.fs = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(code, 27))); // 최우선매도호가
                 curStock.fb = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(code, 28))); // 최우선매수호가
                 curStock.tv = int.Parse(axKHOpenAPI1.GetCommRealData(code, 15));
+                curStock.accumTradeQnt = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(code, 13)));
+                curStock.accumTradePrice = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(code, 14)));
                 curStock.power = (curStock.fb - curStock.firstPrice) / curStock.firstPrice;
                 curStock.idx++;
 
@@ -301,18 +406,35 @@ namespace MJTradier
                     }
                 }
 
+                // 이상 데이터 감지
                 if ((curStock.fs - curStock.fb) / curStock.fb > 0.02)
                     return;
 
-                
-                ////// 전고점 부분 /////////////////////
-                if (SubTimeToTime(curStock.minTime, curStock.maxTime) >= 1 && SubTimeToTime(curStock.time, curStock.maxTime) >= 1 &&
+
+                ////// 전고점 부분 처리 /////////////////////
+                if (curStock.crushCount <= 1 && SubTimeToTime(curStock.minTime, curStock.maxTime) >= 1 && SubTimeToTime(curStock.time, curStock.maxTime) >= 1 &&
                         (curStock.maxPower - curStock.minPower) > 0.01 && curStock.power > curStock.maxPower && curStock.time < 144000)
                 {
                     curStock.crushCount++;
                     if (curStock.crushCount == 1 && curStock.power >= 0.1 && curStock.power <= 0.15)
                     {
                         // 구매해야 함
+                        
+
+                        lockDeposit = true;
+                        SetScreenNo();
+                        curSlot.sRQName = "전고점돌파";
+                        curSlot.sScreenNo = strScreenNum;
+                        curSlot.sAccNo = accountNum;
+                        curSlot.nOrderType = 1;
+                        curSlot.sCode = code;
+                        curSlot.nQty = 0;
+                        curSlot.nPrice = 0;
+                        curSlot.sHogaGb = "03";
+                        curSlot.sOrgOrderNo = curStock.orgOrderNo;
+
+                        tradeQueue.Enqueue(curSlot);
+
                     }
                 }
 
@@ -330,7 +452,7 @@ namespace MJTradier
                     curStock.minTime = curStock.time;
                 }
                 //////////////////////////////////////////
-                
+
 
                 //////////// 바닥잡기 부분 ////////////////////
                 if (curStock.time < curStock.noonTime && curStock.power < -0.17)
@@ -344,8 +466,7 @@ namespace MJTradier
                         // 구매 안하고 종료
                     }
                 }
-                ////////////////////////////////////////////
-            }
+            } // End ---- e.sRealType.Equals("주식체결")
             else if(e.sRealType.Equals("장시작시간"))
             {
                 if (marketStart) // 실시간해지 신청을 했음에도 잔여시간동안 메시지가 올때를 대비한 조건문
@@ -354,11 +475,12 @@ namespace MJTradier
                 string sGubun = axKHOpenAPI1.GetCommRealData(e.sRealKey, 215); // 장운영구분 0 :장시작전, 3 : 장중, 4 : 장종료
                 if (sGubun.Equals('0'))
                 {
+                    testListView.Items.Add("장시작전");
                 }
                 else if (sGubun.Equals('3')) // 장중이라면 
                 {
+                    testListView.Items.Add("장중");
                     marketStart = true;
-                    axKHOpenAPI1.DisconnectRealData("9000");
                 }
             }
         }
@@ -382,13 +504,22 @@ namespace MJTradier
                 string okTradeQuant = axKHOpenAPI1.GetChejanData(911); // 체결량
                 string noTradeQuant = axKHOpenAPI1.GetChejanData(902); // 미체결량
                 string tradeTime = axKHOpenAPI1.GetChejanData(908); // 체결시간
+                sharedTime = Math.Abs(int.Parse(tradeTime));
 
                 int codeIdx = int.Parse(code);
-                curStock =  eachStockArray[codeIdx];
+                curStock =  eachStockArray[eachStockIdxArray[codeIdx]];
                 bool sellMode = curStock.sellMode;
 
                 if (orderStatus.Equals("체결"))
                 {
+                    if (noTradeQuant.Equals('0'))
+                    {
+                        lockDeposit = false;
+                        curStock.orgStatus = false;
+                        curStock.orgOrderNo = "";
+                    }
+
+
                     if (sellMode == true) // 바로 매도 걸기
                     {
 
@@ -400,7 +531,8 @@ namespace MJTradier
                 }
                 else if(orderStatus.Equals("접수"))
                 {
-
+                    curStock.orgStatus = true;
+                    curStock.orgOrderNo = orderNum;
                 }
             }
             else if(e.sGubun.Equals('1')) // 잔고

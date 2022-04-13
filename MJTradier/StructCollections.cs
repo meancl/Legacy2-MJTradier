@@ -14,6 +14,11 @@
             public bool firstCheck;
             public int tenTime;
 
+            /// 거래정도 측정변수
+            public long accumTradeQnt;
+            public long accumTradePrice;
+            /////////////////////
+
             /// 실시간체결 변수
             public int time;
             public int fs;
@@ -48,7 +53,28 @@
             public double buyPower;
             public int buyTime;
             public int buyPrice;
+            public int buyCount;
+            public bool orgStatus;
+            public string orgOrderNo;
             /////////////////////////
         }
+
+        public struct TradeSlot
+        {
+            public int nRqTime; // 주문요청시간
+
+            ////////////// SendOrder 인자들
+            public string sRQName; // 사용자 구분명
+            public string sScreenNo; // 화면번호
+            public string sAccNo; // 계좌번호 10자리
+            public int nOrderType; // 주문유형 1:신규매수, 2:신규매도 3:매수취소, 4:매도취소, 5:매수정정, 6:매도정정
+            public string sCode; // 종목코드(6자리)
+            public int nQty; // 주문수량
+            public int nPrice; // 주문가격
+            public string sHogaGb; // 거래구분 (00:지정가, 03:시장가, ...)
+            public string sOrgOrderNo;  // 원주문번호. 신규주문에는 공백 입력, 정정/취소시 입력합니다.
+            /////////////////////////////////////////////////////
+        }
+
     }
 }

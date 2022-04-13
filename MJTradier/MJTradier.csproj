@@ -57,7 +57,7 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="StructEachStock.cs">
+    <Compile Include="StructCollections.cs">
       <SubType>Form</SubType>
     </Compile>
     <EmbeddedResource Include="Form1.resx">
