@@ -33,6 +33,7 @@
             this.메뉴ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loginToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.checkMyHoldingsButton = new System.Windows.Forms.Button();
             this.checkMyAccountInfoButton = new System.Windows.Forms.Button();
             this.myNameLabel = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
@@ -80,6 +81,7 @@
             // 
             // groupBox1
             // 
+            this.groupBox1.Controls.Add(this.checkMyHoldingsButton);
             this.groupBox1.Controls.Add(this.checkMyAccountInfoButton);
             this.groupBox1.Controls.Add(this.myNameLabel);
             this.groupBox1.Controls.Add(this.label4);
@@ -97,9 +99,18 @@
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "내 정보";
             // 
+            // checkMyHoldingsButton
+            // 
+            this.checkMyHoldingsButton.Location = new System.Drawing.Point(243, 266);
+            this.checkMyHoldingsButton.Name = "checkMyHoldingsButton";
+            this.checkMyHoldingsButton.Size = new System.Drawing.Size(98, 29);
+            this.checkMyHoldingsButton.TabIndex = 12;
+            this.checkMyHoldingsButton.Text = "보유종목확인";
+            this.checkMyHoldingsButton.UseVisualStyleBackColor = true;
+            // 
             // checkMyAccountInfoButton
             // 
-            this.checkMyAccountInfoButton.Location = new System.Drawing.Point(246, 268);
+            this.checkMyAccountInfoButton.Location = new System.Drawing.Point(123, 266);
             this.checkMyAccountInfoButton.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.checkMyAccountInfoButton.Name = "checkMyAccountInfoButton";
             this.checkMyAccountInfoButton.Size = new System.Drawing.Size(98, 29);
@@ -279,6 +290,7 @@
         private System.Windows.Forms.Label myDepositLabel;
         private System.Windows.Forms.Button checkMyAccountInfoButton;
         private System.Windows.Forms.ListView testListView;
+        private System.Windows.Forms.Button checkMyHoldingsButton;
     }
 }
 
