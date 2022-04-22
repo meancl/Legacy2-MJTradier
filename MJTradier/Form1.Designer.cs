@@ -47,11 +47,24 @@
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.button1 = new System.Windows.Forms.Button();
             this.button2 = new System.Windows.Forms.Button();
-            this.testListView = new System.Windows.Forms.ListView();
+            this.testTextBox = new System.Windows.Forms.TextBox();
+            this.marketTrueButton = new System.Windows.Forms.Button();
+            this.sellButton = new System.Windows.Forms.Button();
+            this.codeToSellTextBox = new System.Windows.Forms.TextBox();
+            this.numToSellTextBox = new System.Windows.Forms.TextBox();
+            this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.setShuDownButton = new System.Windows.Forms.Button();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
+            this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.buyButton = new System.Windows.Forms.Button();
+            this.buyCodeTextBox = new System.Windows.Forms.TextBox();
             this.menuStrip1.SuspendLayout();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.axKHOpenAPI1)).BeginInit();
             this.tabControl1.SuspendLayout();
+            this.groupBox2.SuspendLayout();
+            this.groupBox3.SuspendLayout();
             this.SuspendLayout();
             // 
             // menuStrip1
@@ -94,26 +107,26 @@
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Padding = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.groupBox1.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.groupBox1.Size = new System.Drawing.Size(362, 328);
+            this.groupBox1.Size = new System.Drawing.Size(362, 224);
             this.groupBox1.TabIndex = 2;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "내 정보";
             // 
             // checkMyHoldingsButton
             // 
-            this.checkMyHoldingsButton.Location = new System.Drawing.Point(243, 266);
+            this.checkMyHoldingsButton.Location = new System.Drawing.Point(229, 170);
             this.checkMyHoldingsButton.Name = "checkMyHoldingsButton";
-            this.checkMyHoldingsButton.Size = new System.Drawing.Size(98, 29);
+            this.checkMyHoldingsButton.Size = new System.Drawing.Size(127, 29);
             this.checkMyHoldingsButton.TabIndex = 12;
             this.checkMyHoldingsButton.Text = "보유종목확인";
             this.checkMyHoldingsButton.UseVisualStyleBackColor = true;
             // 
             // checkMyAccountInfoButton
             // 
-            this.checkMyAccountInfoButton.Location = new System.Drawing.Point(123, 266);
+            this.checkMyAccountInfoButton.Location = new System.Drawing.Point(81, 170);
             this.checkMyAccountInfoButton.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.checkMyAccountInfoButton.Name = "checkMyAccountInfoButton";
-            this.checkMyAccountInfoButton.Size = new System.Drawing.Size(98, 29);
+            this.checkMyAccountInfoButton.Size = new System.Drawing.Size(125, 29);
             this.checkMyAccountInfoButton.TabIndex = 11;
             this.checkMyAccountInfoButton.Text = "계좌정보확인";
             this.checkMyAccountInfoButton.UseVisualStyleBackColor = true;
@@ -217,7 +230,7 @@
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(758, 111);
+            this.button1.Location = new System.Drawing.Point(128, 127);
             this.button1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(98, 36);
@@ -227,7 +240,7 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(758, 64);
+            this.button2.Location = new System.Drawing.Point(128, 27);
             this.button2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(98, 40);
@@ -235,23 +248,126 @@
             this.button2.Text = "체결로그";
             this.button2.UseVisualStyleBackColor = true;
             // 
-            // testListView
+            // testTextBox
             // 
-            this.testListView.HideSelection = false;
-            this.testListView.Location = new System.Drawing.Point(480, 197);
-            this.testListView.Name = "testListView";
-            this.testListView.Size = new System.Drawing.Size(376, 173);
-            this.testListView.TabIndex = 8;
-            this.testListView.UseCompatibleStateImageBehavior = false;
+            this.testTextBox.Location = new System.Drawing.Point(488, 435);
+            this.testTextBox.Multiline = true;
+            this.testTextBox.Name = "testTextBox";
+            this.testTextBox.Size = new System.Drawing.Size(577, 170);
+            this.testTextBox.TabIndex = 9;
+            // 
+            // marketTrueButton
+            // 
+            this.marketTrueButton.Location = new System.Drawing.Point(38, 40);
+            this.marketTrueButton.Name = "marketTrueButton";
+            this.marketTrueButton.Size = new System.Drawing.Size(96, 40);
+            this.marketTrueButton.TabIndex = 10;
+            this.marketTrueButton.Text = "강제장시작";
+            this.marketTrueButton.UseVisualStyleBackColor = true;
+            // 
+            // sellButton
+            // 
+            this.sellButton.Location = new System.Drawing.Point(236, 136);
+            this.sellButton.Name = "sellButton";
+            this.sellButton.Size = new System.Drawing.Size(96, 40);
+            this.sellButton.TabIndex = 11;
+            this.sellButton.Text = "판매";
+            this.sellButton.UseVisualStyleBackColor = true;
+            // 
+            // codeToSellTextBox
+            // 
+            this.codeToSellTextBox.Location = new System.Drawing.Point(110, 127);
+            this.codeToSellTextBox.Name = "codeToSellTextBox";
+            this.codeToSellTextBox.Size = new System.Drawing.Size(100, 25);
+            this.codeToSellTextBox.TabIndex = 13;
+            // 
+            // numToSellTextBox
+            // 
+            this.numToSellTextBox.Location = new System.Drawing.Point(110, 166);
+            this.numToSellTextBox.Name = "numToSellTextBox";
+            this.numToSellTextBox.Size = new System.Drawing.Size(100, 25);
+            this.numToSellTextBox.TabIndex = 14;
+            // 
+            // groupBox2
+            // 
+            this.groupBox2.Controls.Add(this.buyCodeTextBox);
+            this.groupBox2.Controls.Add(this.buyButton);
+            this.groupBox2.Controls.Add(this.setShuDownButton);
+            this.groupBox2.Controls.Add(this.label5);
+            this.groupBox2.Controls.Add(this.label3);
+            this.groupBox2.Controls.Add(this.marketTrueButton);
+            this.groupBox2.Controls.Add(this.sellButton);
+            this.groupBox2.Controls.Add(this.numToSellTextBox);
+            this.groupBox2.Controls.Add(this.codeToSellTextBox);
+            this.groupBox2.Location = new System.Drawing.Point(389, 42);
+            this.groupBox2.Name = "groupBox2";
+            this.groupBox2.Size = new System.Drawing.Size(338, 352);
+            this.groupBox2.TabIndex = 15;
+            this.groupBox2.TabStop = false;
+            this.groupBox2.Text = "테스트용(삭제예정)";
+            // 
+            // setShuDownButton
+            // 
+            this.setShuDownButton.Location = new System.Drawing.Point(191, 40);
+            this.setShuDownButton.Name = "setShuDownButton";
+            this.setShuDownButton.Size = new System.Drawing.Size(100, 40);
+            this.setShuDownButton.TabIndex = 17;
+            this.setShuDownButton.Text = "강제장마감";
+            this.setShuDownButton.UseVisualStyleBackColor = true;
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(15, 169);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(67, 15);
+            this.label5.TabIndex = 16;
+            this.label5.Text = "매도수량";
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(6, 130);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(97, 15);
+            this.label3.TabIndex = 15;
+            this.label3.Text = "매도종목코드";
+            // 
+            // groupBox3
+            // 
+            this.groupBox3.Controls.Add(this.button1);
+            this.groupBox3.Controls.Add(this.button2);
+            this.groupBox3.Location = new System.Drawing.Point(751, 42);
+            this.groupBox3.Name = "groupBox3";
+            this.groupBox3.Size = new System.Drawing.Size(314, 224);
+            this.groupBox3.TabIndex = 16;
+            this.groupBox3.TabStop = false;
+            this.groupBox3.Text = "미구현";
+            // 
+            // buyButton
+            // 
+            this.buyButton.Location = new System.Drawing.Point(212, 245);
+            this.buyButton.Name = "buyButton";
+            this.buyButton.Size = new System.Drawing.Size(96, 52);
+            this.buyButton.TabIndex = 18;
+            this.buyButton.Text = "매수버튼";
+            this.buyButton.UseVisualStyleBackColor = true;
+            // 
+            // buyCodeTextBox
+            // 
+            this.buyCodeTextBox.Location = new System.Drawing.Point(38, 245);
+            this.buyCodeTextBox.Name = "buyCodeTextBox";
+            this.buyCodeTextBox.Size = new System.Drawing.Size(100, 25);
+            this.buyCodeTextBox.TabIndex = 19;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1087, 620);
-            this.Controls.Add(this.testListView);
-            this.Controls.Add(this.button2);
-            this.Controls.Add(this.button1);
+            this.Controls.Add(this.groupBox3);
+            this.Controls.Add(this.groupBox2);
+            this.Controls.Add(this.testTextBox);
             this.Controls.Add(this.axKHOpenAPI1);
             this.Controls.Add(this.tabControl1);
             this.Controls.Add(this.groupBox1);
@@ -266,6 +382,9 @@
             this.groupBox1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.axKHOpenAPI1)).EndInit();
             this.tabControl1.ResumeLayout(false);
+            this.groupBox2.ResumeLayout(false);
+            this.groupBox2.PerformLayout();
+            this.groupBox3.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -289,8 +408,19 @@
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Label myDepositLabel;
         private System.Windows.Forms.Button checkMyAccountInfoButton;
-        private System.Windows.Forms.ListView testListView;
         private System.Windows.Forms.Button checkMyHoldingsButton;
+        private System.Windows.Forms.TextBox testTextBox;
+        private System.Windows.Forms.Button marketTrueButton;
+        private System.Windows.Forms.Button sellButton;
+        private System.Windows.Forms.TextBox codeToSellTextBox;
+        private System.Windows.Forms.TextBox numToSellTextBox;
+        private System.Windows.Forms.GroupBox groupBox2;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.GroupBox groupBox3;
+        private System.Windows.Forms.Button setShuDownButton;
+        private System.Windows.Forms.Button buyButton;
+        private System.Windows.Forms.TextBox buyCodeTextBox;
     }
 }
 

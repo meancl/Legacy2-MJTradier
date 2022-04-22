@@ -10,75 +10,79 @@
             // ----------------------------------
             // 기본정보 변수
             // ----------------------------------
-            public string screenNum;
-            public string code;
-            public int marketGubun; // 1이면 코스닥, 2이면 코스피
+            public string sRealScreenNum;
+            public string sCode;
+            public int nMarketGubun; // 1이면 코스닥, 2이면 코스피
 
             // ----------------------------------
             // 초기 변수
             // ----------------------------------
-            public bool firstCheck;
-            public int firstTime;
-            public int firstPrice;
-            public int tenTime;
+            public bool isFirstCheck;
+            public int nFirstTime;
+            public int nFirstPrice;
+            public int nTenTime;
 
             // ----------------------------------
             // 실시간체결 변수
             // ----------------------------------
-            public int time;
-            public int fs;
-            public int fb;
-            public int tv;
-            public long accumTradeQnt;
-            public long accumTradePrice;
-            public int idx;
-            public double power;
+            public int nTime;
+            public int nFs;
+            public int nFb;
+            public int nTv;
+            public int nIdx;
+            public double fPower;
 
             // ----------------------------------
             // 전고점 변수
             // ----------------------------------
-            public int minTime;
-            public int maxTime;
-            public double maxPower;
-            public double minPower;
-            public int crushCount;
+            public int nMinTime;
+            public int nMaxTime;
+            public double fMaxPower;
+            public double fMinPower;
 
             // ----------------------------------
             // 바닥잡기 변수
             // ----------------------------------
-            public int noonTime;   // 11시로 하느냐, 12시로 하느냐
-
-            // ----------------------------------
-            // 플래그 변수
-            // ----------------------------------
-            public bool initMode;  // (삭제예정)처음상태확인 플래그 : true면 처음, false면 사용중
-            public bool passMode;  // 이제 실시간을 더 안들여봐도 되는 종목인 경우 true로 설정
+            public int nNoonTime;   // 11시로 하느냐, 12시로 하느냐
 
             // ----------------------------------
             // 매매관련 변수
             // ----------------------------------
-            public int nOrderType; // 1:신규매수 2:신규매도 3:매수취소 4:매도취소 5:매수정정 6:매도정정
-            public int nOrderTime;
-            public int nOrderPrice;
-            public bool orgStatus; // 현재 매매중인 지 확인하는 변수
-            public string orgOrderNo; // 원주문번호   default:""
+            public int nCurOrderType; // 1:신규매수 2:신규매도 3:매수취소 4:매도취소 5:매수정정 6:매도정정
+            public int nCurLimitPrice; // 지정가가 estimatedPrice를 초과하는 미체결 수량이 남았다면 처분하기 위한 변수
+            public int nCurOrderPrice; // 매수주문했을때의 최우선매도호가
+            public int nCurRqTime; // 매수주문했을때의 시간
+            public bool isOrderStatus; // 현재 매매중인 지 확인하는 변수;
+            public string sCurOrgOrderId; // 원주문번호   default:""
+            public string sCurOrgBuyId;  // 매수취소,정정용 원주문번호
+            public string sCurOrgSellId; // 매도취소,정정용 원주문번호
 
+
+            public int nBuyReqCnt; // 현재 종목의 매수신청카운트
+            public int nSellReqCnt; // 현재 종목의 매도신청카운트 
+            public bool isCancelMode; // 현재 매수에서 매수취소가 나왔으면 더이상의 현재의 거래에서 매수취소요청을 금지하기 위한 변수
+            public bool isCancelComplete; // 매수취소가 성공한 경우를 판별하는 변수
+            public int nCurBuySlotIdx; // 매도신청 실패 시 매도모드를 취소해야하기 위한 변수
+            
             // ----------------------------------
             // 매도관련 변수
             // ----------------------------------
-            public double targetPercent; // 익절 퍼센트
-            public double bottomPercent; // 손절 퍼센트
-            public bool bTradeEnds; // 매매가 완료되었는 지 확인하는 변수
-            public int nBuyedPrice; // 전량체결됐을때 매입단가
-            public int nBuyingPrice; // 미체결된 거래가 남아있을 때 매입단가
-            public int sellMode;  // 매도전략 플래그 : 1이면 지정가매도, 2이면 시장가매도
-            
+            public int nBuyedPrice; // 매입단가
+            public int nHoldingsCnt; // 보유종목수
+            public double fTargetPercent; // 익절 퍼센트
+            public double fBottomPercent; // 손절 퍼센트
             // ----------------------------------
             // 매수관련 변수
+            // ----------------------------------     
+
+            // ----------------------------------
+            // 체결관련 변수
             // ----------------------------------
             
             
         }
+
+
 
         // ============================================
         // 매매요청 큐에 저장하기 위한 구조체변수
@@ -87,6 +91,11 @@
         {
             public int nRqTime; // 주문요청시간
 
+
+            public double fTargetPercent; // 익절 퍼센트 //TODAY
+            public double fBottomPercent; // 손절 퍼센트 //TODAY
+            public int nEachStockIdx; // 개인구조체인덱스 //TODAY
+            public int nBuySlotIdx; // 구매열람인덱스 //TODAY
             // ----------------------------------
             // SendOrder 인자들
             // ----------------------------------
@@ -96,9 +105,10 @@
             public int nOrderType; // 주문유형 1:신규매수, 2:신규매도 3:매수취소, 4:매도취소, 5:매수정정, 6:매도정정
             public string sCode; // 종목코드(6자리)
             public int nQty; // 주문수량
-            public int nPrice; // 주문가격
+            public int nOrderPrice; // 주문가격
             public string sHogaGb; // 거래구분 (00:지정가, 03:시장가, ...)
-            public string sOrgOrderNo;  // 원주문번호. 신규주문에는 공백 입력, 정정/취소시 입력합니다.
+            public string sOrgOrderId;  // 원주문번호. 신규주문에는 공백 입력, 정정/취소시 입력합니다.
+
             
         }
 
@@ -107,11 +117,27 @@
         // ============================================
         public struct Holdings
         {
-            public string code;
-            public string codeName;
-            public double yield;
-            public int holdingQty;
-            public int buyedPrice;
+            public string sCode;
+            public string sCodeName;
+            public double fYield;
+            public int nHoldingQty;
+            public int nBuyedPrice;
+            public int nCurPrice;
+            public int nTotalPL;
+            public int nNumPossibleToSell;
+        }
+
+        // ============================================
+        // 개인구조체 구매횟수 구조체
+        // ============================================
+        public struct BuySlot //TODAY
+        {
+            public int nBuyPrice; // 얼마에 구매했어
+            public int nBuyVolume; // 얼마나 구매했어
+            public double fTargetPer; // 얼마에 익절할거야
+            public double fBottomPer; // 얼마에 손절할거야
+            public bool isSelled; // 전부 팔렸어
+            public bool isAllBuyed; // 전부 사졌어
         }
 
     }

@@ -88,6 +88,8 @@
 
             return gap;
         }
+
+        
         /// KiwoomLibrary Part 종료
         /////////////////////////////////
 
