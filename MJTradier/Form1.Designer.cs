@@ -152,6 +152,8 @@
             this.testTextBox.Location = new System.Drawing.Point(375, 42);
             this.testTextBox.Multiline = true;
             this.testTextBox.Name = "testTextBox";
+            this.testTextBox.ReadOnly = true;
+            this.testTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this.testTextBox.Size = new System.Drawing.Size(700, 563);
             this.testTextBox.TabIndex = 9;
             // 

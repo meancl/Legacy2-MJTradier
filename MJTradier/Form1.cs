@@ -27,7 +27,8 @@ namespace MJTradier
         private const int MAX_STOCK_NUM = 1000000; // 최종주식종목 수
         public const int NUM_SEP_PER_SCREEN = 100; // 한 화면번호 당 가능요청 수
         public const double STOCK_TAX = 0.0023; // 거래세 //++
-        public const double STOCK_FEE = 0.0035; // 증권 매매 수수료
+        public const double STOCK_FEE = 0.00015; // 증권 매매 수수료
+        public const double VIRTUAL_STOCK_FEE = 0.0035; // 증권 매매 수수료
         public const int MAX_STOCK_HOLDINGS_NUM = 200; // 보유주식을 저장하는 구조체 최대 갯수
         public const int EYES_CLOSE_NUM = 3; // 현재가에서 EYES_CLOSE_NUM 스텝만큼 가격을 올려 지정가에 두기 위한 스텝 변수
         public const int SHUTDOWN_TIME = 150000; // 마감시간
@@ -87,6 +88,7 @@ namespace MJTradier
         public Queue<TradeSlot> tradeQueue = new Queue<TradeSlot>(); // 매매신청을 담는 큐, 매매컨트롤러가 사용할 큐
         TradeSlot curSlot; // 임시로 사용하능한 매매요청, 매매컨트롤러 변수
         public const int MAX_REQ_TIME = 1000;
+        public bool[] chanceFloorCntArray = new bool[30];
         //--------------------------------------------------------
         // 계좌평가잔고내역요청 변수
         //--------------------------------------------------------
@@ -345,10 +347,9 @@ namespace MJTradier
 
                 sAccountNum = accountArray[0]; // 처음계좌가 main계좌
                 accountComboBox.Text = sAccountNum;
-                SubscribeRealData(); // 실시간 구독 (2)
-                RequestDeposit(); // 예수금상세현황요청 (3)
-
-                RequestTradeResult(); //--
+                SubscribeRealData(); // 실시간 구독 
+                RequestDeposit(); // 예수금상세현황요청 
+                isMarketStart = true;//오늘삭제
                 foreach (string sAccount in accountArray)
                 {
                     if (sAccount.Length > 0)
@@ -468,6 +469,8 @@ namespace MJTradier
             } // END ---- e.sRQName.Equals("계좌평가잔고내역요청")
             else if(e.sRQName.Equals("당일실현손익상세요청"))
             {
+                int nTodayResult = int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "당일실현손익"));
+                testTextBox.AppendText("당일실현손익 : " + nTodayResult + "(원) \r\n"); //++
                 int rows = axKHOpenAPI1.GetRepeatCnt(e.sTrCode, e.sRecordName);
                
                 string sCode;
@@ -506,7 +509,8 @@ namespace MJTradier
             {
                 string sCode = e.sRealKey;
                 eachStockArray[nCurIdx].nTime = nSharedTime = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 20))); // 현재시간
-
+                string sCurTime = DateTime.Now.ToString("hhmmss");//삭제
+                testTextBox.AppendText(SubTimeToTime(int.Parse(sCurTime), nSharedTime).ToString() + " : " +sCurTime +" ,"+nSharedTime.ToString() + "\r\n");//삭제
                 // -------------------------------------------------------------------------
                 // 매매컨트롤러 부분
                 // 매매컨트롤러 부분은 Async를 사용하려 했는데
@@ -546,7 +550,7 @@ namespace MJTradier
                                             nEstimatedPrice += GetKospiGap(nEstimatedPrice);
                                     }
 
-                                    double fCurLimitPriceFee = (nEstimatedPrice * (1 + STOCK_FEE));
+                                    double fCurLimitPriceFee = (nEstimatedPrice * (1 + VIRTUAL_STOCK_FEE));
 
                                     int nNumToBuy = (int)(nCurDeposit / fCurLimitPriceFee); // 현재 예수금으로 살 수 있을 만큼
                                     int nMaxNumToBuy = (int)(nMaxPriceForEachStock / fCurLimitPriceFee); // 최대매수가능금액으로 살 수 있을 만큼
@@ -651,6 +655,7 @@ namespace MJTradier
 
                 if (nSharedTime >= SHUTDOWN_TIME) // 3시가 넘었으면
                 {
+                    testTextBox.AppendText("3시가 지났다\r\n");
                     nShutDown++; // 장이 끝남을 알린다 (nShutDown이 0일때는 전량매도작업을 수행하지 않기 때문에)
                     isMarketStart = false; // 장 중 시그널을 off한다
                     for(int nScreenNum = REAL_SCREEN_NUM_START; nScreenNum <= REAL_SCREEN_NUM_END; nScreenNum++)
@@ -676,7 +681,7 @@ namespace MJTradier
 
                 // 현재 거래중이고(nBuyReqCnt > 0) 현재 매수취소가 가능한 상태라면 접근 가능
 
-                if (eachStockArray[curSlot.nEachStockIdx].isOrderStatus)
+                if (eachStockArray[nCurIdx].isOrderStatus)
                 {
                     if ((eachStockArray[nCurIdx].nBuyReqCnt > 0) && !eachStockArray[nCurIdx].isCancelMode) // 미체결량이 남아있다면
                     {
@@ -717,13 +722,13 @@ namespace MJTradier
 
                             nBuyPrice = buySlotArray[nCurIdx, i].nBuyPrice; // 처음 초기화됐을때는 0인데 체결이 된 상태에서만 접근 가능하니 사졌을 때의 평균매입가
                             fYield = (eachStockArray[nCurIdx].nFb - nBuyPrice) / nBuyPrice; // 현재 최우선매수호가 와의 손익률을 구한다
-                            if (fYield >= buySlotArray[nCurIdx, i].fTargetPer + (STOCK_TAX + STOCK_FEE)) // 손익률이 익절퍼센트를 넘기면
+                            if (fYield >= buySlotArray[nCurIdx, i].fTargetPer + (STOCK_TAX + STOCK_FEE + STOCK_FEE)) // 손익률이 익절퍼센트를 넘기면
                             {
                                 isSell = true;
                                 curSlot.sRQName = "익절매도";
                                 testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 익절매도신청 \r\n"); //++
                             }
-                            else if (fYield <= buySlotArray[nCurIdx, i].fBottomPer + (STOCK_TAX + STOCK_FEE)) // 손익률이 손절퍼센트보다 낮으면
+                            else if (fYield <= buySlotArray[nCurIdx, i].fBottomPer + (STOCK_TAX + STOCK_FEE + STOCK_FEE)) // 손익률이 손절퍼센트보다 낮으면
                             {
                                 isSell = true;
                                 curSlot.sRQName = "손절매도";
@@ -1130,7 +1135,8 @@ namespace MJTradier
                     // -----------------------------------------
                     // 바닥잡기 처리
                     // -----------------------------------------
-                    if ((eachStockArray[nCurIdx].nTime < eachStockArray[nCurIdx].nNoonTime) &&
+                    if ( !chanceFloorCntArray[17] &&
+                        (eachStockArray[nCurIdx].nTime < eachStockArray[nCurIdx].nNoonTime) &&
                          (eachStockArray[nCurIdx].fPower < -0.17))
                     {
                         if (eachStockArray[nCurIdx].nIdx > 1000)
@@ -1147,6 +1153,7 @@ namespace MJTradier
                             curSlot.fBottomPercent = -0.06;
 
                             tradeQueue.Enqueue(curSlot);
+                            chanceFloorCntArray[17] = true;
                             testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 바닥잡기 매수신청 \r\n"); //++
                         }
                     }// END ---- 바닥잡기 처리
@@ -1165,9 +1172,11 @@ namespace MJTradier
                 string sGubun = axKHOpenAPI1.GetCommRealData(e.sRealKey, 215); // 장운영구분 0 :장시작전, 3 : 장중, 4 : 장종료
                 if (sGubun.Equals("0")) // 장시작 전
                 {
+                    testTextBox.AppendText("장시작전\r\n");//++
                 }
                 else if (sGubun.Equals("3")) // 장 중
                 {
+                    testTextBox.AppendText("장중\r\n");//++
                     isMarketStart = true;
                     //nFirstDisposal = 0;
                     RequestHoldings(0); // 장시작하고 잔여종목 전량매도
@@ -1176,12 +1185,14 @@ namespace MJTradier
                 {
                     if (sGubun.Equals("2")) // 장 종료 10분전 동시호가
                     {
+                        testTextBox.AppendText("장종료전\r\n");//++
                         isMarketStart = false;
                         nShutDown++;
                         RequestHoldings(0); // 장 끝나기 전 잔여종목 전량매도
                     }
                     else if (sGubun.Equals("4")) // 장 종료
                     {
+                        testTextBox.AppendText("장종료\r\n");//++
                         isMarketStart = false;
                         nShutDown++;
                         isForCheckHoldings = true;
@@ -1307,7 +1318,7 @@ namespace MJTradier
                             eachStockArray[nCurIdx].sCurOrgBuyId = sOrderId; // 매수취소,정정용 원주문번호
                             eachStockArray[nCurIdx].isOrderStatus = true; // 매매중 on
 
-                            nCurDeposit -= (int)(nOrderVolume * eachStockArray[nCurIdx].nCurLimitPrice * (1 + STOCK_FEE)); // 예수금에서 매매수수료까지 포함해서 차감
+                            nCurDeposit -= (int)(nOrderVolume * eachStockArray[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)); // 예수금에서 매매수수료까지 포함해서 차감
 
                             testTextBox.AppendText(sTradeTime + " : " + sCode +", "+ nOrderVolume + "(주) 매수 접수완료 \r\n"); //++
                             //---------------------------------------------
@@ -1329,7 +1340,7 @@ namespace MJTradier
                 {
                     if (sOrderStatus.Equals("체결")) 
                     {
-                        nCurDeposit += (int)(Math.Abs(int.Parse(sCurOkTradeVolume)) * Math.Abs(int.Parse(sCurOkTradePrice)) * (1-(STOCK_TAX + STOCK_FEE))); //**
+                        nCurDeposit += (int)(Math.Abs(int.Parse(sCurOkTradeVolume)) * Math.Abs(int.Parse(sCurOkTradePrice)) * (1-(STOCK_TAX + VIRTUAL_STOCK_FEE))); //**
 
                         if (nNoTradeVolume == 0)
                         {
@@ -1374,7 +1385,7 @@ namespace MJTradier
                         // 매수취소 수량과 미체결량을 검사해준다.
                         if ( nNoTradeVolume < nOrderVolume  && nOrderVolume > 0) // 매수취소된 수량이 있다면
                         {
-                            nCurDeposit += (int)((nOrderVolume - nNoTradeVolume) * (eachStockArray[nCurIdx].nCurLimitPrice * (1 + STOCK_FEE)));
+                            nCurDeposit += (int)((nOrderVolume - nNoTradeVolume) * (eachStockArray[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)));
                         }
                         
                     }
