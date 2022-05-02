@@ -114,6 +114,7 @@ namespace MJTradier
 
         public string sBefore = "";//삭제예정
         public int nBeforeCnt;
+        public int nBeforeCnt2;
         public int nBeforeShared;
 
         public Form1()
@@ -525,19 +526,21 @@ namespace MJTradier
                 eachStockArray[nCurIdx].nTime = nSharedTime = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 20))); // 현재시간
                 string sCurTime = DateTime.Now.ToString("hhmmss");//삭제
                 nBeforeCnt++;
-                //if (!sBefore.Equals(sCurTime))
-                //{
-                //    sBefore = sCurTime;
-                //    testTextBox.AppendText(nBeforeCnt.ToString() + " 카운트만큼 걸렸음.\r\n");
-                //    nBeforeCnt = 0;
-                //}
-                //testTextBox.AppendText(SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");//삭제
+                nBeforeCnt2++;
+                if (!sBefore.Equals(sCurTime))
+                {
+                    sBefore = sCurTime;
+                    testTextBox.AppendText("---" +nBeforeCnt.ToString() + "\r\n");
+                    nBeforeCnt = 0;
+                }
+
+                ////testTextBox.AppendText(SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");//삭제
 
                 if (nBeforeShared != nSharedTime)
                 {
-                    testTextBox.AppendText(nBeforeCnt.ToString() + ",  이전시간 : " + nBeforeShared.ToString() + ", 현재시간 : " + nSharedTime.ToString() + "\r\n");
+                    testTextBox.AppendText("#########"+  nBeforeCnt2.ToString() + "\r\n");
                     nBeforeShared = nSharedTime;
-                    nBeforeCnt = 0;
+                    nBeforeCnt2 = 0;
 
                 }
 
