@@ -18,6 +18,18 @@
             return hour * 10000 + minute * 100 + second;
         }
 
+        int SubTimeToTimeAndSec(int timeToBeSub, int timeToSub)
+        {
+            if (timeToBeSub <= timeToSub)
+                return 0;
+
+            int secToBeSub = (int)(timeToBeSub / 10000) * 3600 + (int)(timeToBeSub / 100) % 100 * 60 + timeToBeSub % 100;
+            int secToSub = (int)(timeToSub / 10000) * 3600 + (int)(timeToSub / 100) % 100 * 60 + timeToSub % 100;
+
+            return secToBeSub - secToSub;
+        }
+
+
         int SubTimeBySec(int timeToBeSub, int subSec)
         {
             int secToBeSub = (int)(timeToBeSub / 10000) * 3600 + (int)(timeToBeSub / 100) % 100 * 60 + timeToBeSub % 100;

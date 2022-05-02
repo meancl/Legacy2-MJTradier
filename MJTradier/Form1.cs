@@ -21,8 +21,8 @@ namespace MJTradier
         // ------------------------------------------------------
         // 상수 변수
         // ------------------------------------------------------
-        private const byte KOSDAQ_ID = 1;  // 코스닥을 증명하는 상수
-        private const byte KOSPI_ID = 2; // 코스피를 증명하는 상수
+        private const byte KOSDAQ_ID = 0;  // 코스닥을 증명하는 상수
+        private const byte KOSPI_ID = 1; // 코스피를 증명하는 상수
         private const int BILLION = 100000000; // 1억
         private const int MAX_STOCK_NUM = 1000000; // 최종주식종목 수
         public const int NUM_SEP_PER_SCREEN = 100; // 한 화면번호 당 가능요청 수
@@ -65,7 +65,7 @@ namespace MJTradier
         // ------------------------------------------------------
         // 종목획득 변수
         // ------------------------------------------------------
-        private string sConfigurationPath = @"G:\getData\kiwoom\"; // 코스피, 코스닥 종목을 저장해놓은 파일의 디렉터리 경로
+        private string sConfigurationPath = @"D:\MJ\stock\getData\kiwoom\"; // 코스피, 코스닥 종목을 저장해놓은 파일의 디렉터리 경로
         private string[] kosdaqCodes; // 코스닥 종목들을 저장한 문자열 배열
         private string[] kospiCodes; //  코스피 종목들을 저장한 문자열 배열
 
@@ -88,7 +88,8 @@ namespace MJTradier
         public Queue<TradeSlot> tradeQueue = new Queue<TradeSlot>(); // 매매신청을 담는 큐, 매매컨트롤러가 사용할 큐
         TradeSlot curSlot; // 임시로 사용하능한 매매요청, 매매컨트롤러 변수
         public const int MAX_REQ_TIME = 1000;
-        public bool[] chanceFloorCntArray = new bool[30];
+        public const int MAX_REQ_SEC = 600;
+        public bool[,] chanceFloorCntArray = new bool[2,31]; // 0은 코스닥, 1은 코스피 , 31설정은 -0 ~ -30까지를 의미
         //--------------------------------------------------------
         // 계좌평가잔고내역요청 변수
         //--------------------------------------------------------
@@ -99,16 +100,21 @@ namespace MJTradier
         //--------------------------------------------------------
         // 전고점 변수
         //--------------------------------------------------------
-        public const int MAX_CRUSH_COUNT_SEC = 200;
-        public int[,] crushCounts = new int[MAX_CRUSH_COUNT_SEC, MAX_CRUSH_COUNT_SEC];
+        public const int MAX_CRUSH_COUNT_X1_SEC = 60; // x1 의 최대
+        public const int MAX_CRUSH_COUNT_X2_SEC = 120; // x2 의 최대
+        public int[,] crushCounts = new int[MAX_CRUSH_COUNT_X1_SEC + 1, MAX_CRUSH_COUNT_X2_SEC + 1]; // + 1은 인덱스는 0부터니까
 
         //--------------------------------------------------------
         // 개인구조체 매수슬롯 변수
         //--------------------------------------------------------
-        public const int BUY_SLOT_NUM = 50; 
+        public const int BUY_SLOT_NUM = 50;
+        public const int BUY_LIMIT_NUM = 5;
         public BuySlot[,] buySlotArray;
         public int[] buySlotCntArray;
-        
+
+        public string sBefore = "";//삭제예정
+        public int nBeforeCnt;
+        public int nBeforeShared;
 
         public Form1()
         {
@@ -168,8 +174,15 @@ namespace MJTradier
         // ============================================
         private void MappingFileToStockCodes() 
         {
-            kosdaqCodes = System.IO.File.ReadAllLines(sConfigurationPath + "today_kosdaq_stock_code.txt");
-            kospiCodes = System.IO.File.ReadAllLines(sConfigurationPath + "today_kospi_stock_code.txt");
+            kosdaqCodes = System.IO.File.ReadAllLines("today_kosdaq_stock_code.txt");
+            kospiCodes = System.IO.File.ReadAllLines("today_kospi_stock_code.txt");
+            
+            //kosdaqCodes = new string[0];
+            //kospiCodes = new string[0];
+
+            testTextBox.AppendText("Kosdaq : " + kosdaqCodes.Length.ToString() + "\r\n");
+            testTextBox.AppendText("Kospi : " + kospiCodes.Length.ToString() + "\r\n");
+
             eachStockArray = new EachStock[kosdaqCodes.Length + kospiCodes.Length];
             buySlotArray = new BuySlot[kosdaqCodes.Length + kospiCodes.Length, BUY_SLOT_NUM]; // ex. [1600, 50]
             buySlotCntArray = new int[kosdaqCodes.Length + kospiCodes.Length]; // ex. [1600]
@@ -505,29 +518,60 @@ namespace MJTradier
         // ============================================
         private void OnReceiveRealDataHandler(object sender, AxKHOpenAPILib._DKHOpenAPIEvents_OnReceiveRealDataEvent e)
         {
+
             if (e.sRealType.Equals("주식체결"))
             {
                 string sCode = e.sRealKey;
                 eachStockArray[nCurIdx].nTime = nSharedTime = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 20))); // 현재시간
                 string sCurTime = DateTime.Now.ToString("hhmmss");//삭제
-                testTextBox.AppendText(SubTimeToTime(int.Parse(sCurTime), nSharedTime).ToString() + " : " +sCurTime +" ,"+nSharedTime.ToString() + "\r\n");//삭제
+                nBeforeCnt++;
+                //if (!sBefore.Equals(sCurTime))
+                //{
+                //    sBefore = sCurTime;
+                //    testTextBox.AppendText(nBeforeCnt.ToString() + " 카운트만큼 걸렸음.\r\n");
+                //    nBeforeCnt = 0;
+                //}
+                //testTextBox.AppendText(SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");//삭제
+
+                if (nBeforeShared != nSharedTime)
+                {
+                    testTextBox.AppendText(nBeforeCnt.ToString() + ",  이전시간 : " + nBeforeShared.ToString() + ", 현재시간 : " + nSharedTime.ToString() + "\r\n");
+                    nBeforeShared = nSharedTime;
+                    nBeforeCnt = 0;
+
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
                 // -------------------------------------------------------------------------
                 // 매매컨트롤러 부분
                 // 매매컨트롤러 부분은 Async를 사용하려 했는데
                 // 오버헤드가 클거같아서 실시간 부분에 끼워넣었다.
                 // -------------------------------------------------------------------------
                 // 예수금이 세팅돼있고 큐에 하나이상의 슬롯이 존재하면 접근 가능
+
+
                 if (isDepositSet && (tradeQueue.Count > 0)) // START ---- 매매컨트롤러
                 {
                     curSlot = tradeQueue.Dequeue(); // 우선 디큐한다
 
-                    if (SubTimeToTime(nSharedTime, curSlot.nRqTime) <= IGNORE_REQ_SEC) // 현재시간 - 요청시간 < 10초 : 요청시간이 너무 길어진 요청의 처리를 위한 분기문  
+                    if (SubTimeToTimeAndSec(nSharedTime, curSlot.nRqTime) <= IGNORE_REQ_SEC) // 현재시간 - 요청시간 < 10초 : 요청시간이 너무 길어진 요청의 처리를 위한 분기문  
                     {
 
                         if (curSlot.nOrderType <= 2) // 신규매수매도 신규매수:1 신규매도:2
                         {
                             // 아직 매수중이거나 매도중일때는
-                            if ((eachStockArray[curSlot.nEachStockIdx].nBuyReqCnt > 0 ) || (eachStockArray[curSlot.nEachStockIdx].nSellReqCnt > 0)) // 현재 거래중이면
+                            if ((eachStockArray[curSlot.nEachStockIdx].nBuyReqCnt > 0) || (eachStockArray[curSlot.nEachStockIdx].nSellReqCnt > 0)) // 현재 거래중이면
                             {
                                 if (curSlot.nOrderType == 2) // 매도신청은 버려져서는 안됨.
                                     curSlot.nRqTime = nSharedTime; // 요청시간을 현재시간으로 설정
@@ -559,27 +603,31 @@ namespace MJTradier
                                         nNumToBuy = nMaxNumToBuy; // 최대매수가능수로 세팅
 
                                     // 구매수량이 있고 현재종목의 최우선매도호가가 요청하려는 지정가보다 낮을 경우 구매요청을 걸 수 있다.
-                                    if ( (nNumToBuy > 0) && (eachStockArray[curSlot.nEachStockIdx].nFs < nEstimatedPrice) ) 
+                                    if ((nNumToBuy > 0) && (eachStockArray[curSlot.nEachStockIdx].nFs < nEstimatedPrice))
                                     {
                                         if (curSlot.sHogaGb.Equals("03")) // 시장가모드 : 시장가로 하면 키움에서 상한가값으로 계산해서 예수금만큼 살 수 가 없다
-                                        { 
-                                            
-                                            eachStockArray[curSlot.nEachStockIdx].nCurLimitPrice = nEstimatedPrice; // 지정상한가 설정
-                                            eachStockArray[curSlot.nEachStockIdx].fTargetPercent = curSlot.fTargetPercent; // 익절퍼센트 설정
-                                            eachStockArray[curSlot.nEachStockIdx].fBottomPercent = curSlot.fBottomPercent; // 손절퍼센트 설정
-                                            eachStockArray[curSlot.nEachStockIdx].nCurBuySlotIdx = buySlotCntArray[curSlot.nEachStockIdx]; // 종목의 현재 거래레코드 인덱스(종목에 한번도 매수를 안했었으면 0)
-                                            eachStockArray[curSlot.nEachStockIdx].nCurRqTime = nSharedTime; // 현재시간설정
-
-                                            testTextBox.AppendText(eachStockArray[curSlot.nEachStockIdx].nCurRqTime + " : " + sCode + " 매수신청 전송 \r\n"); //++
-                                            int nBuyReqResult = axKHOpenAPI1.SendOrder(curSlot.sRQName, SetTradeScreenNo(), sAccountNum,
-                                                curSlot.nOrderType, curSlot.sCode, nNumToBuy, nEstimatedPrice,
-                                                "00", curSlot.sOrgOrderId); // 높은 매도호가에 지정가로 걸어 시장가처럼 사게 한다
-                                                                            // 최우선매도호가보다 높은 가격에 지정가를 걸면 현재매도호가에 구매하게 된다.
-                                            if (nBuyReqResult == 0 ) // 요청이 성공하면
+                                        {
+                                            if (buySlotCntArray[curSlot.nEachStockIdx] < BUY_LIMIT_NUM) // 개인 구매횟수를 넘기지 않았다면
                                             {
-                                                eachStockArray[curSlot.nEachStockIdx].nBuyReqCnt++; // 구매횟수 증가
-                                                testTextBox.AppendText(sCode + " 매수신청 전송 성공 \r\n"); //++
+                                                eachStockArray[curSlot.nEachStockIdx].nCurLimitPrice = nEstimatedPrice; // 지정상한가 설정
+                                                eachStockArray[curSlot.nEachStockIdx].fTargetPercent = curSlot.fTargetPercent; // 익절퍼센트 설정
+                                                eachStockArray[curSlot.nEachStockIdx].fBottomPercent = curSlot.fBottomPercent; // 손절퍼센트 설정
+                                                eachStockArray[curSlot.nEachStockIdx].nCurBuySlotIdx = buySlotCntArray[curSlot.nEachStockIdx]; // 종목의 현재 거래레코드 인덱스(종목에 한번도 매수를 안했었으면 0)
+                                                eachStockArray[curSlot.nEachStockIdx].nCurRqTime = nSharedTime; // 현재시간설정
+
+                                                testTextBox.AppendText(eachStockArray[curSlot.nEachStockIdx].nCurRqTime + " : " + sCode + " 매수신청 전송 \r\n"); //++
+                                                int nBuyReqResult = axKHOpenAPI1.SendOrder(curSlot.sRQName, SetTradeScreenNo(), sAccountNum,
+                                                    curSlot.nOrderType, curSlot.sCode, nNumToBuy, nEstimatedPrice,
+                                                    "00", curSlot.sOrgOrderId); // 높은 매도호가에 지정가로 걸어 시장가처럼 사게 한다
+                                                                                // 최우선매도호가보다 높은 가격에 지정가를 걸면 현재매도호가에 구매하게 된다.
+                                                if (nBuyReqResult == 0) // 요청이 성공하면
+                                                {
+                                                    eachStockArray[curSlot.nEachStockIdx].nBuyReqCnt++; // 구매횟수 증가
+                                                    testTextBox.AppendText(sCode + " 매수신청 전송 성공 \r\n"); //++
+                                                }
                                             }
+                                            else  // 개인 구매횟수를 넘겼다면
+                                                testTextBox.AppendText(curSlot.sCode + " 종목의 구매횟수를 초과했습니다.\r\n");
                                         }
                                     }
                                 } // END ---- 신규매수
@@ -587,7 +635,7 @@ namespace MJTradier
                                 {
                                     if (curSlot.sHogaGb.Equals("03")) // 시장가매도
                                     {
-                                        
+
                                         eachStockArray[curSlot.nEachStockIdx].nCurBuySlotIdx = curSlot.nBuySlotIdx; // 필요없는 작업인데 혹시 몰라 남겨놓음
                                         eachStockArray[curSlot.nEachStockIdx].nCurRqTime = nSharedTime; // 현재시간설정
 
@@ -621,7 +669,7 @@ namespace MJTradier
                             int nCancelReqResult = axKHOpenAPI1.SendOrder(curSlot.sRQName, SetTradeScreenNo(), sAccountNum,
                                 curSlot.nOrderType, curSlot.sCode, 0, 0,
                                 "", curSlot.sOrgOrderId);
-                            
+
                             if (nCancelReqResult != 0) // 매수취소가 성공하지 않으면
                             {
                                 eachStockArray[curSlot.nEachStockIdx].isCancelMode = false; // 해당종목의 현재 매수취소시그널을 false한다
@@ -650,519 +698,556 @@ namespace MJTradier
                 // -------------------------------------------------------------------------
 
 
-                if (!isMarketStart) // 장이 시작 안했으면 접근 금지
-                    return;
-
-                if (nSharedTime >= SHUTDOWN_TIME) // 3시가 넘었으면
+                if (isMarketStart) // 장이 시작 안했으면 접근 금지
                 {
-                    testTextBox.AppendText("3시가 지났다\r\n");
-                    nShutDown++; // 장이 끝남을 알린다 (nShutDown이 0일때는 전량매도작업을 수행하지 않기 때문에)
-                    isMarketStart = false; // 장 중 시그널을 off한다
-                    for(int nScreenNum = REAL_SCREEN_NUM_START; nScreenNum <= REAL_SCREEN_NUM_END; nScreenNum++)
+                    if (nSharedTime >= SHUTDOWN_TIME) // 3시가 넘었으면
                     {
-                        // 실시간 체결에 할당된 화면번호들에 대해 다 디스커넥트한다
-                        // 실시간 체결만 받고있는 화면번호들만이 아니라 전부를 디스커넥트하는 이유는
-                        // 전부를 디스커넥트하는 잠깐의 시간동안 잔여 실시간주식체결데이터들이 처리되는 것을 기다리는 기능도 있다.
-                        axKHOpenAPI1.DisconnectRealData(nScreenNum.ToString()); 
-                    }
-                    RequestHoldings(0); // 잔고현황을 체크한다. 이때 nShutDown이 양수이기 때문에 남아있는 주식들이 있으면 전량 매도한다.
-                    return;
-                }
-
-                
-                int nCodeIdx = int.Parse(sCode);
-                nCurIdx = eachStockIdxArray[nCodeIdx];
-                
-                eachStockArray[nCurIdx].nFs = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 27))); // 최우선매도호가
-                eachStockArray[nCurIdx].nFb = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 28))); // 최우선매수호가
-                eachStockArray[nCurIdx].nTv = int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 15)); // 현재 체결량
-                eachStockArray[nCurIdx].nIdx++; // 인덱스를 올린다.
-
-
-                // 현재 거래중이고(nBuyReqCnt > 0) 현재 매수취소가 가능한 상태라면 접근 가능
-
-                if (eachStockArray[nCurIdx].isOrderStatus)
-                {
-                    if ((eachStockArray[nCurIdx].nBuyReqCnt > 0) && !eachStockArray[nCurIdx].isCancelMode) // 미체결량이 남아있다면
-                    {
-                        // 현재 최우선매도호가가 지정상한가를 넘었거나 매매 요청시간과 현재시간이 너무 오래 차이난다면(= 매수가 너무 오래걸린다 = 거래량이 낮고 머 별거 없다)
-                        if ((eachStockArray[nCurIdx].nFs > eachStockArray[nCurIdx].nCurLimitPrice) || (SubTimeToTime(nSharedTime, eachStockArray[nCurIdx].nCurRqTime) >= MAX_REQ_TIME)) // 지정가를 초과하거나 오래걸린다면
+                        testTextBox.AppendText("3시가 지났다\r\n");
+                        nShutDown++; // 장이 끝남을 알린다 (nShutDown이 0일때는 전량매도작업을 수행하지 않기 때문에)
+                        isMarketStart = false; // 장 중 시그널을 off한다
+                        for (int nScreenNum = REAL_SCREEN_NUM_START; nScreenNum <= REAL_SCREEN_NUM_END; nScreenNum++)
                         {
-                            curSlot.sRQName = "매수취소";
-                            curSlot.nOrderType = 3; // 매수취소
-                            curSlot.sCode = sCode;
-                            curSlot.sOrgOrderId = eachStockArray[nCurIdx].sCurOrgBuyId; // 현재 매수의 원주문번호를 넣어준다.
-                            curSlot.nRqTime = eachStockArray[nCurIdx].nTime; // 현재시간설정
-
-                            tradeQueue.Enqueue(curSlot); // 매매신청큐에 인큐
-
-                            eachStockArray[nCurIdx].isCancelMode = true; // 현재 매수취소 불가능상태로 만든다
-                            testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 매수취소신청 \r\n"); //++
+                            // 실시간 체결에 할당된 화면번호들에 대해 다 디스커넥트한다
+                            // 실시간 체결만 받고있는 화면번호들만이 아니라 전부를 디스커넥트하는 이유는
+                            // 전부를 디스커넥트하는 잠깐의 시간동안 잔여 실시간주식체결데이터들이 처리되는 것을 기다리는 기능도 있다.
+                            axKHOpenAPI1.DisconnectRealData(nScreenNum.ToString());
                         }
-                    }
-                }
-                
-
-
-                // 이걸 어찌해야하나 고민중이다... nHoldingCnt말고 더 좋은 변수를 이자리에 넣을 수 있을거같은 생각이 든다.
-                if (eachStockArray[nCurIdx].nHoldingsCnt > 0) // 보유종목이 있다면
-                {
-                    int nBuySlotIdx = buySlotCntArray[nCurIdx]; // 현재 종목의 매수 record수를 체크
-                    // 한번의 레코드 신청이 있다하더라도 매수가 완료된 시점에 ++하기 떄문에
-                    // 처음에는 0일테고 하나의 거래가 완료되면 1이 되니 그때부터 for문에서 접근 가능
-                    int nBuyPrice;
-                    double fYield;
-
-                    for (int i = 0; i < nBuySlotIdx; i++) // 반복적 확인
-                    {
-                        // 그리고 !isSelled 아직 판매완료가 안됐을때 접근 가능
-                        if (!buySlotArray[nCurIdx, i].isSelled)
-                        {
-                            bool isSell = false;
-
-                            nBuyPrice = buySlotArray[nCurIdx, i].nBuyPrice; // 처음 초기화됐을때는 0인데 체결이 된 상태에서만 접근 가능하니 사졌을 때의 평균매입가
-                            fYield = (eachStockArray[nCurIdx].nFb - nBuyPrice) / nBuyPrice; // 현재 최우선매수호가 와의 손익률을 구한다
-                            if (fYield >= buySlotArray[nCurIdx, i].fTargetPer + (STOCK_TAX + STOCK_FEE + STOCK_FEE)) // 손익률이 익절퍼센트를 넘기면
-                            {
-                                isSell = true;
-                                curSlot.sRQName = "익절매도";
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 익절매도신청 \r\n"); //++
-                            }
-                            else if (fYield <= buySlotArray[nCurIdx, i].fBottomPer + (STOCK_TAX + STOCK_FEE + STOCK_FEE)) // 손익률이 손절퍼센트보다 낮으면
-                            {
-                                isSell = true;
-                                curSlot.sRQName = "손절매도";
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 손절매도신청 \r\n"); //++
-                            }
-
-                            if (isSell)
-                            {
-                                curSlot.nOrderType = 2; // 신규매도
-                                curSlot.sCode = sCode;
-                                curSlot.nQty = buySlotArray[nCurIdx, i].nBuyVolume; // 이 레코드에 있는 전량을 판매한다
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nBuySlotIdx = i; // 나중에 요청전송이 실패할때 다시 취소하기 위해 적어놓는 변수
-                                curSlot.nEachStockIdx = nCurIdx; // 현재 종목의 인덱스
-                                curSlot.nRqTime = eachStockArray[nCurIdx].nTime; // 현재시간 설정
-
-                                tradeQueue.Enqueue(curSlot); // 매매요청큐에 인큐한다
-                                buySlotArray[nCurIdx, i].isSelled = true; // 현재 거래레코드는 판매완료됐다, 요청전송 실패됐을때는 다시 false로 설정된다.
-                                
-                            }
-                        }
-                    } // END ---- 반복적 확인 종료
-                } // END ---- 보유종목이 있다면
-
-
-
-
-                // 처음가격과 시간등을 맞추려는 변수이다.
-                if (!eachStockArray[nCurIdx].isFirstCheck) // 개인 초기작업
-                {
-                    if (eachStockArray[nCurIdx].nFirstTime == 0) // 처음일때 시간설정
-                    {
-                        eachStockArray[nCurIdx].nFirstTime = eachStockArray[nCurIdx].nTime; // 장시작되고 처음 얻어지는 시간
-                        eachStockArray[nCurIdx].nTenTime = AddTimeBySec(eachStockArray[nCurIdx].nFirstTime, 3600); // 처음시간에 + 3600초(1시간)을 더한 시간
-                        eachStockArray[nCurIdx].nNoonTime = 120000; // 12시
-                    }
-
-                    if (eachStockArray[nCurIdx].nFs == 0 && eachStockArray[nCurIdx].nFb == 0)  // 둘 다 데이터가 없는경우는 가격초기화가 불가능하기 return
+                        RequestHoldings(0); // 잔고현황을 체크한다. 이때 nShutDown이 양수이기 때문에 남아있는 주식들이 있으면 전량 매도한다.
                         return;
-                    else
-                    {
-                        // 둘다 제대로 받아졌거나 , 둘 중 하나가 안받아졌거나
-
-                        if (eachStockArray[nCurIdx].nFs == 0) // fs가 안받아졌으면 fb 가격에 fb갭 한칸을 더해서 설정
-                            eachStockArray[nCurIdx].nFs = eachStockArray[nCurIdx].nFb + GetKosdaqGap(eachStockArray[nCurIdx].nFb);
-                        
-                        if (eachStockArray[nCurIdx].nFb == 0) // fb가 안받아졌으면 fs 가격에 (fs-1)갭 한칸을 마이너스해서 설정
-                            // fs-1 인 이유는 fs가 1000원이라하면 fb는 999여야하는데 갭을 받을때 5를 받게되니 fb가 995가 되어버린다.이는 오류!
-                            eachStockArray[nCurIdx].nFb = eachStockArray[nCurIdx].nFs - GetKosdaqGap(eachStockArray[nCurIdx].nFs-1);
-                        
-                        eachStockArray[nCurIdx].nFirstPrice = eachStockArray[nCurIdx].nFs;
-
-                        if (eachStockArray[nCurIdx].nFs < 1000) // 1000원도 안한다면 폐기처분
-                        {
-                            axKHOpenAPI1.SetRealRemove(eachStockArray[nCurIdx].sRealScreenNum, eachStockArray[nCurIdx].sCode);
-                        }
-                        eachStockArray[nCurIdx].isFirstCheck = true; // 가격설정이 끝났으면 이종목의 초기체크는 완료 설정
                     }
-                } // END ---- 개인 초기작업
 
 
-                // 파워는 최우선매수호가와 초기가격의 손익률로 계산한다
-                eachStockArray[nCurIdx].fPower = (double)(eachStockArray[nCurIdx].nFb - eachStockArray[nCurIdx].nFirstPrice) / eachStockArray[nCurIdx].nFirstPrice;
+                    int nCodeIdx = int.Parse(sCode);
+                    nCurIdx = eachStockIdxArray[nCodeIdx];
 
-                // 이상 데이터 감지
-                // fs와 fb의 가격차이가 2퍼가 넘을경우 이상데이터라 생각하고 리턴한다.
-                // 미리 리턴하는 이유는 이런 이상 데이터로는 전략에 사용하지 않기위해서 전략찾는 부분 위에서 리턴여부를 검증한다.
-                if ((eachStockArray[nCurIdx].nFs - eachStockArray[nCurIdx].nFb) / eachStockArray[nCurIdx].nFb > 0.02)
-                    return;
-
-                // -----------------------------------------------
-                // 코스피, 코스닥 공용 전략 
-                // 이 구간에는 코스피와 코스닥에 공동으로 사용가능한 전략들을
-                // 찾는 구간이다
-                // -----------------------------------------------
-                
-                // END ---- 코스피, 코스닥 공용 전략 
+                    eachStockArray[nCurIdx].nFs = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 27))); // 최우선매도호가
+                    eachStockArray[nCurIdx].nFb = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 28))); // 최우선매수호가
+                    eachStockArray[nCurIdx].nTv = int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 15)); // 현재 체결량
+                    eachStockArray[nCurIdx].nIdx++; // 인덱스를 올린다.
 
 
-                if (eachStockArray[nCurIdx].nMarketGubun == KOSDAQ_ID) // 코스닥 한정 전략
-                {
+                    // 현재 거래중이고(nBuyReqCnt > 0) 현재 매수취소가 가능한 상태라면 접근 가능
 
-                    // -----------------------------------------
-                    // 전고점 돌파 처리
-                    // -----------------------------------------
-                    if (((eachStockArray[nCurIdx].fMaxPower - eachStockArray[nCurIdx].fMinPower) > 0.01) &&
-                        (eachStockArray[nCurIdx].fPower > eachStockArray[nCurIdx].fMaxPower) &&
-                        (eachStockArray[nCurIdx].nTime < BAN_BUY_TIME))
+                    if (eachStockArray[nCurIdx].isOrderStatus)
                     {
-
-
-                        if ( (crushCounts[10, 10] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 10) )
+                        if ((eachStockArray[nCurIdx].nBuyReqCnt > 0) && !eachStockArray[nCurIdx].isCancelMode) // 미체결량이 남아있다면
                         {
-                            crushCounts[10, 10]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                            // 현재 최우선매도호가가 지정상한가를 넘었거나 매매 요청시간과 현재시간이 너무 오래 차이난다면(= 매수가 너무 오래걸린다 = 거래량이 낮고 머 별거 없다)
+                            if ((eachStockArray[nCurIdx].nFs > eachStockArray[nCurIdx].nCurLimitPrice) || (SubTimeToTimeAndSec(nSharedTime, eachStockArray[nCurIdx].nCurRqTime) >= MAX_REQ_SEC)) // 지정가를 초과하거나 오래걸린다면
                             {
-                                // 만약 조건이 만족하여 매수하게 된다면
-                                // 중요하게 필요한것은 
-                                // 현재 인덱스와 현재 가격
-                                // 익절퍼센트, 손절퍼센트가 유의미하게 필요하다
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
+                                curSlot.sRQName = "매수취소";
+                                curSlot.nOrderType = 3; // 매수취소
                                 curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.04;
-                                curSlot.fBottomPercent = -0.05;
+                                curSlot.sOrgOrderId = eachStockArray[nCurIdx].sCurOrgBuyId; // 현재 매수의 원주문번호를 넣어준다.
+                                curSlot.nRqTime = eachStockArray[nCurIdx].nTime; // 현재시간설정
 
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime +" : "+ sCode + " 10,10(1) 매수신청 \r\n"); //++
-                            }
-                        }
+                                tradeQueue.Enqueue(curSlot); // 매매신청큐에 인큐
 
-                        if ((crushCounts[10, 10] == 1) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 10))
-                        {
-                            crushCounts[10, 10]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.03;
-                                curSlot.fBottomPercent = -0.07;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,10(2) 매수신청 \r\n"); //++
-                            }
-                        }
-
-                        if ((crushCounts[15, 15] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 15) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 15))
-                        {
-                            crushCounts[15, 15]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 15,15 매수신청 \r\n"); //++
-                            }
-                        }
-
-                        if ((crushCounts[20, 20] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 20) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 20))
-                        {
-                            crushCounts[20, 20]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 20,20 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[40, 40] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 40) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 40))
-                        {
-                            crushCounts[40, 40]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 40,40 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[10, 30] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 30))
-                        {
-                            crushCounts[10, 30]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,30 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[10, 100] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 100))
-                        {
-                            crushCounts[10, 100]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,100 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[30, 100] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 30) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 100))
-                        {
-                            crushCounts[30, 100]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 30,100 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[30, 30] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 30) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 30))
-                        {
-                            crushCounts[30, 30]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 30,30 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[5, 30] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 5) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 30))
-                        {
-                            crushCounts[5, 30]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 5,30 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[5, 100] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 5) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 100))
-                        {
-                            crushCounts[5, 100]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.06;
-                                curSlot.fBottomPercent = -0.05;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 5,100 매수신청 \r\n"); //++
-                            }
-                        }
-
-                        if ((crushCounts[1, 5] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 5) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 100))
-                        {
-                            crushCounts[1, 5]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.04;
-                                curSlot.fBottomPercent = -0.03;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 1,5 매수신청 \r\n"); //++
-                            }
-                        }
-                        if ((crushCounts[1, 1] == 0) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 5) &&
-                             (SubTimeToTime(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 100))
-                        {
-                            crushCounts[1, 1]++;
-                            if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
-                            {
-                                curSlot.sRQName = "전고점돌파";
-                                curSlot.nOrderType = 1; // 신규매수
-                                curSlot.sCode = sCode;
-                                curSlot.nEachStockIdx = nCurIdx;
-                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                                curSlot.sHogaGb = "03";
-                                curSlot.sOrgOrderId = "";
-                                curSlot.nRqTime = nSharedTime;
-                                curSlot.fTargetPercent = 0.04;
-                                curSlot.fBottomPercent = -0.03;
-
-                                tradeQueue.Enqueue(curSlot);
-                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 1,1 매수신청 \r\n"); //++
+                                eachStockArray[nCurIdx].isCancelMode = true; // 현재 매수취소 불가능상태로 만든다
+                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 매수취소신청 \r\n"); //++
                             }
                         }
                     }
 
-                    if (eachStockArray[nCurIdx].fMaxPower < eachStockArray[nCurIdx].fPower)
-                    {
-                        eachStockArray[nCurIdx].fMaxPower = eachStockArray[nCurIdx].fPower;
-                        eachStockArray[nCurIdx].nMaxTime = eachStockArray[nCurIdx].nTime;
-                        eachStockArray[nCurIdx].fMinPower = eachStockArray[nCurIdx].fPower;
-                        eachStockArray[nCurIdx].nMinTime = eachStockArray[nCurIdx].nTime;
-                    }
-
-                    if (eachStockArray[nCurIdx].fMinPower > eachStockArray[nCurIdx].fPower)
-                    {
-                        eachStockArray[nCurIdx].fMinPower = eachStockArray[nCurIdx].fPower;
-                        eachStockArray[nCurIdx].nMinTime = eachStockArray[nCurIdx].nTime;
-                    }// END ---- 전고점돌파
 
 
-                    // -----------------------------------------
-                    // 바닥잡기 처리
-                    // -----------------------------------------
-                    if ( !chanceFloorCntArray[17] &&
-                        (eachStockArray[nCurIdx].nTime < eachStockArray[nCurIdx].nNoonTime) &&
-                         (eachStockArray[nCurIdx].fPower < -0.17))
+                    // 이걸 어찌해야하나 고민중이다... nHoldingCnt말고 더 좋은 변수를 이자리에 넣을 수 있을거같은 생각이 든다.
+                    if (eachStockArray[nCurIdx].nHoldingsCnt > 0) // 보유종목이 있다면
                     {
-                        if (eachStockArray[nCurIdx].nIdx > 1000)
+                        int nBuySlotIdx = buySlotCntArray[nCurIdx]; // 현재 종목의 매수 record수를 체크
+                                                                    // 한번의 레코드 신청이 있다하더라도 매수가 완료된 시점에 ++하기 떄문에
+                                                                    // 처음에는 0일테고 하나의 거래가 완료되면 1이 되니 그때부터 for문에서 접근 가능
+                        int nBuyPrice;
+                        double fYield;
+
+                        for (int i = 0; i < nBuySlotIdx; i++) // 반복적 확인
                         {
-                            curSlot.sRQName = "바닥잡기";
-                            curSlot.nOrderType = 1; // 신규매수
-                            curSlot.sCode = sCode;
-                            curSlot.nEachStockIdx = nCurIdx;
-                            curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
-                            curSlot.sHogaGb = "03";
-                            curSlot.sOrgOrderId = "";
-                            curSlot.nRqTime = nSharedTime;
-                            curSlot.fTargetPercent = 0.05;
-                            curSlot.fBottomPercent = -0.06;
+                            // 그리고 !isSelled 아직 판매완료가 안됐을때 접근 가능
+                            if (!buySlotArray[nCurIdx, i].isSelled)
+                            {
+                                bool isSell = false;
 
-                            tradeQueue.Enqueue(curSlot);
-                            chanceFloorCntArray[17] = true;
-                            testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 바닥잡기 매수신청 \r\n"); //++
+                                nBuyPrice = buySlotArray[nCurIdx, i].nBuyPrice; // 처음 초기화됐을때는 0인데 체결이 된 상태에서만 접근 가능하니 사졌을 때의 평균매입가
+                                fYield = (eachStockArray[nCurIdx].nFb - nBuyPrice) / nBuyPrice; // 현재 최우선매수호가 와의 손익률을 구한다
+                                if (fYield >= buySlotArray[nCurIdx, i].fTargetPer + (STOCK_TAX + STOCK_FEE + STOCK_FEE)) // 손익률이 익절퍼센트를 넘기면
+                                {
+                                    isSell = true;
+                                    curSlot.sRQName = "익절매도";
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 익절매도신청 \r\n"); //++
+                                }
+                                else if (fYield <= buySlotArray[nCurIdx, i].fBottomPer + (STOCK_TAX + STOCK_FEE + STOCK_FEE)) // 손익률이 손절퍼센트보다 낮으면
+                                {
+                                    isSell = true;
+                                    curSlot.sRQName = "손절매도";
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 손절매도신청 \r\n"); //++
+                                }
+
+                                if (isSell)
+                                {
+                                    curSlot.nOrderType = 2; // 신규매도
+                                    curSlot.sCode = sCode;
+                                    curSlot.nQty = buySlotArray[nCurIdx, i].nBuyVolume; // 이 레코드에 있는 전량을 판매한다
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nBuySlotIdx = i; // 나중에 요청전송이 실패할때 다시 취소하기 위해 적어놓는 변수
+                                    curSlot.nEachStockIdx = nCurIdx; // 현재 종목의 인덱스
+                                    curSlot.nRqTime = eachStockArray[nCurIdx].nTime; // 현재시간 설정
+
+                                    tradeQueue.Enqueue(curSlot); // 매매요청큐에 인큐한다
+                                    buySlotArray[nCurIdx, i].isSelled = true; // 현재 거래레코드는 판매완료됐다, 요청전송 실패됐을때는 다시 false로 설정된다.
+
+                                }
+                            }
+                        } // END ---- 반복적 확인 종료
+                    } // END ---- 보유종목이 있다면
+
+
+
+
+                    // 처음가격과 시간등을 맞추려는 변수이다.
+                    if (!eachStockArray[nCurIdx].isFirstCheck) // 개인 초기작업
+                    {
+                        if (eachStockArray[nCurIdx].nFirstTime == 0) // 처음일때 시간설정
+                        {
+                            eachStockArray[nCurIdx].nFirstTime = eachStockArray[nCurIdx].nTime; // 장시작되고 처음 얻어지는 시간
+                            eachStockArray[nCurIdx].nTenTime = AddTimeBySec(eachStockArray[nCurIdx].nFirstTime, 3600); // 처음시간에 + 3600초(1시간)을 더한 시간
+                            eachStockArray[nCurIdx].nNoonTime = 120000; // 12시
                         }
-                    }// END ---- 바닥잡기 처리
 
-                } // END ---- 코스닥 한정 전략
-                else if (eachStockArray[nCurIdx].nMarketGubun == KOSPI_ID) // 코스피 한정 전략
-                {
+                        if (eachStockArray[nCurIdx].nFs == 0 && eachStockArray[nCurIdx].nFb == 0)  // 둘 다 데이터가 없는경우는 가격초기화가 불가능하기 return
+                            return;
+                        else
+                        {
+                            // 둘다 제대로 받아졌거나 , 둘 중 하나가 안받아졌거나
+                            if (eachStockArray[nCurIdx].nFs == 0) // fs가 안받아졌으면 fb 가격에 fb갭 한칸을 더해서 설정
+                            {
+                                int gap = 0;
+                                if (eachStockArray[nCurIdx].nMarketGubun == KOSDAQ_ID)
+                                    gap = GetKosdaqGap(eachStockArray[nCurIdx].nFb);
+                                else if (eachStockArray[nCurIdx].nMarketGubun == KOSPI_ID)
+                                    gap = GetKospiGap(eachStockArray[nCurIdx].nFb);
 
-                } // END ---- 코스피 한정 전략
+                                eachStockArray[nCurIdx].nFs = eachStockArray[nCurIdx].nFb + gap;
+                            }
+
+
+                            if (eachStockArray[nCurIdx].nFb == 0) // fb가 안받아졌으면 fs 가격에 (fs-1)갭 한칸을 마이너스해서 설정
+                            {
+                                // fs-1 인 이유는 fs가 1000원이라하면 fb는 999여야하는데 갭을 받을때 5를 받게되니 fb가 995가 되어버린다.이는 오류!
+                                int gap = 0;
+                                if (eachStockArray[nCurIdx].nMarketGubun == KOSDAQ_ID)
+                                    gap = GetKosdaqGap(eachStockArray[nCurIdx].nFs - 1);
+                                else if (eachStockArray[nCurIdx].nMarketGubun == KOSPI_ID)
+                                    gap = GetKospiGap(eachStockArray[nCurIdx].nFs - 1);
+
+                                eachStockArray[nCurIdx].nFb = eachStockArray[nCurIdx].nFs - gap;
+                            }
+
+                            eachStockArray[nCurIdx].nFirstPrice = eachStockArray[nCurIdx].nFs;
+
+                            if (eachStockArray[nCurIdx].nFs < 1000) // 1000원도 안한다면 폐기처분
+                            {
+                                axKHOpenAPI1.SetRealRemove(eachStockArray[nCurIdx].sRealScreenNum, eachStockArray[nCurIdx].sCode);
+                            }
+                            eachStockArray[nCurIdx].isFirstCheck = true; // 가격설정이 끝났으면 이종목의 초기체크는 완료 설정
+                        }
+                    } // END ---- 개인 초기작업
+
+
+                    // 파워는 최우선매수호가와 초기가격의 손익률로 계산한다
+                    eachStockArray[nCurIdx].fPower = (double)(eachStockArray[nCurIdx].nFb - eachStockArray[nCurIdx].nFirstPrice) / eachStockArray[nCurIdx].nFirstPrice;
+
+                    // 이상 데이터 감지
+                    // fs와 fb의 가격차이가 2퍼가 넘을경우 이상데이터라 생각하고 리턴한다.
+                    // 미리 리턴하는 이유는 이런 이상 데이터로는 전략에 사용하지 않기위해서 전략찾는 부분 위에서 리턴여부를 검증한다.
+                    if ((eachStockArray[nCurIdx].nFs - eachStockArray[nCurIdx].nFb) / eachStockArray[nCurIdx].nFb > 0.02)
+                        return;
+
+                    // -----------------------------------------------
+                    // 코스피, 코스닥 공용 전략 
+                    // 이 구간에는 코스피와 코스닥에 공동으로 사용가능한 전략들을
+                    // 찾는 구간이다
+                    // -----------------------------------------------
+
+                    // END ---- 코스피, 코스닥 공용 전략 
+
+
+                    if (eachStockArray[nCurIdx].nMarketGubun == KOSDAQ_ID) // 코스닥 한정 전략
+                    {
+
+                        // -----------------------------------------
+                        // 전고점 돌파 처리
+                        // -----------------------------------------
+                        if ((eachStockArray[nCurIdx].fPower > eachStockArray[nCurIdx].fMaxPower) &&
+                            ((eachStockArray[nCurIdx].fMaxPower - eachStockArray[nCurIdx].fMinPower) > 0.01) &&
+                            (eachStockArray[nCurIdx].nTime < BAN_BUY_TIME))
+                        {
+
+
+                            if ((crushCounts[10, 10] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 10))
+                            {
+                                crushCounts[10, 10]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    // 만약 조건이 만족하여 매수하게 된다면
+                                    // 중요하게 필요한것은 
+                                    // 현재 인덱스와 현재 가격
+                                    // 익절퍼센트, 손절퍼센트가 유의미하게 필요하다
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.04;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,10(1) 매수신청 \r\n"); //++
+                                }
+                            }
+
+                            if ((crushCounts[10, 10] == 1) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 10))
+                            {
+                                crushCounts[10, 10]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.03;
+                                    curSlot.fBottomPercent = -0.07;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,10(2) 매수신청 \r\n"); //++
+                                }
+                            }
+
+                            if ((crushCounts[15, 15] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 15) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 15))
+                            {
+                                crushCounts[15, 15]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 15,15 매수신청 \r\n"); //++
+                                }
+                            }
+
+                            if ((crushCounts[20, 20] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 20) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 20))
+                            {
+                                crushCounts[20, 20]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 20,20 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[40, 40] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 40) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 40))
+                            {
+                                crushCounts[40, 40]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 40,40 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[10, 30] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 30))
+                            {
+                                crushCounts[10, 30]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,30 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[10, 60] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 10) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 60))
+                            {
+                                crushCounts[10, 60]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 10,60 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[30, 60] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 30) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 60))
+                            {
+                                crushCounts[30, 60]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 30,60 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[30, 30] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 30) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 30))
+                            {
+                                crushCounts[30, 30]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 30,30 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[5, 30] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 5) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 30))
+                            {
+                                crushCounts[5, 30]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 5,30 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[5, 60] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 5) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 60))
+                            {
+                                crushCounts[5, 60]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.06;
+                                    curSlot.fBottomPercent = -0.05;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 5,60 매수신청 \r\n"); //++
+                                }
+                            }
+
+                            if ((crushCounts[1, 5] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 1) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 5))
+                            {
+                                crushCounts[1, 5]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.04;
+                                    curSlot.fBottomPercent = -0.03;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 1,5 매수신청 \r\n"); //++
+                                }
+                            }
+                            if ((crushCounts[1, 1] == 0) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nMinTime, eachStockArray[nCurIdx].nMaxTime) >= 1) &&
+                                 (SubTimeToTimeAndSec(eachStockArray[nCurIdx].nTime, eachStockArray[nCurIdx].nMaxTime) >= 1))
+                            {
+                                crushCounts[1, 1]++;
+                                if (eachStockArray[nCurIdx].fPower >= 0.1 && eachStockArray[nCurIdx].fPower <= 0.15 && eachStockArray[nCurIdx].nIdx > 100)
+                                {
+                                    curSlot.sRQName = "전고점돌파";
+                                    curSlot.nOrderType = 1; // 신규매수
+                                    curSlot.sCode = sCode;
+                                    curSlot.nEachStockIdx = nCurIdx;
+                                    curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nRqTime = nSharedTime;
+                                    curSlot.fTargetPercent = 0.04;
+                                    curSlot.fBottomPercent = -0.03;
+
+                                    tradeQueue.Enqueue(curSlot);
+                                    testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 1,1 매수신청 \r\n"); //++
+                                }
+                            }
+                        }
+
+                        if (eachStockArray[nCurIdx].fMaxPower < eachStockArray[nCurIdx].fPower)
+                        {
+                            eachStockArray[nCurIdx].fMaxPower = eachStockArray[nCurIdx].fPower;
+                            eachStockArray[nCurIdx].nMaxTime = eachStockArray[nCurIdx].nTime;
+                            eachStockArray[nCurIdx].fMinPower = eachStockArray[nCurIdx].fPower;
+                            eachStockArray[nCurIdx].nMinTime = eachStockArray[nCurIdx].nTime;
+                        }
+
+                        if (eachStockArray[nCurIdx].fMinPower > eachStockArray[nCurIdx].fPower)
+                        {
+                            eachStockArray[nCurIdx].fMinPower = eachStockArray[nCurIdx].fPower;
+                            eachStockArray[nCurIdx].nMinTime = eachStockArray[nCurIdx].nTime;
+                        }// END ---- 전고점돌파
+
+
+                        // -----------------------------------------
+                        // 바닥잡기 처리
+                        // -----------------------------------------
+                        if (!chanceFloorCntArray[KOSDAQ_ID, 17] &&
+                            (eachStockArray[nCurIdx].nTime < eachStockArray[nCurIdx].nNoonTime) &&
+                             (eachStockArray[nCurIdx].fPower < -0.17))
+                        {
+                            if (eachStockArray[nCurIdx].nIdx > 200)
+                            {
+                                curSlot.sRQName = "바닥잡기";
+                                curSlot.nOrderType = 1; // 신규매수
+                                curSlot.sCode = sCode;
+                                curSlot.nEachStockIdx = nCurIdx;
+                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                curSlot.sHogaGb = "03";
+                                curSlot.sOrgOrderId = "";
+                                curSlot.nRqTime = nSharedTime;
+                                curSlot.fTargetPercent = 0.05;
+                                curSlot.fBottomPercent = -0.06;
+
+                                tradeQueue.Enqueue(curSlot);
+                                chanceFloorCntArray[KOSDAQ_ID, 17] = true;
+                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 코스닥 바닥잡기 매수신청 \r\n"); //++
+                            }
+                        }// END ---- 바닥잡기 처리
+
+                    } // END ---- 코스닥 한정 전략
+                    else if (eachStockArray[nCurIdx].nMarketGubun == KOSPI_ID) // 코스피 한정 전략
+                    {
+                        if (!chanceFloorCntArray[KOSPI_ID, 15] &&
+                            (eachStockArray[nCurIdx].nTime < eachStockArray[nCurIdx].nNoonTime) &&
+                             (eachStockArray[nCurIdx].fPower < -0.15))
+                        {
+                            if (eachStockArray[nCurIdx].nIdx > 200)
+                            {
+                                curSlot.sRQName = "바닥잡기";
+                                curSlot.nOrderType = 1; // 신규매수
+                                curSlot.sCode = sCode;
+                                curSlot.nEachStockIdx = nCurIdx;
+                                curSlot.nOrderPrice = eachStockArray[nCurIdx].nFs;
+                                curSlot.sHogaGb = "03";
+                                curSlot.sOrgOrderId = "";
+                                curSlot.nRqTime = nSharedTime;
+                                curSlot.fTargetPercent = 0.06;
+                                curSlot.fBottomPercent = -0.06;
+
+                                tradeQueue.Enqueue(curSlot);
+                                chanceFloorCntArray[KOSPI_ID, 15] = true;
+                                testTextBox.AppendText(eachStockArray[nCurIdx].nTime + " : " + sCode + " 코스피 바닥잡기 매수신청 \r\n"); //++
+                            }
+                        }// END ---- 바닥잡기 처리
+                    } // END ---- 코스피 한정 전략
+                }
 
 
             }// End ---- e.sRealType.Equals("주식체결")
