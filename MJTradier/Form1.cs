@@ -117,6 +117,10 @@ namespace MJTradier
         public int nBeforeCnt2;
         public int nBeforeShared;
 
+        public int nBeforeRecord;
+        public int nBeforeRecord2;
+        public int nTotalRecord; 
+
         public Form1()
         {
             InitializeComponent(); // c# 고유 고정메소드  
@@ -531,6 +535,11 @@ namespace MJTradier
                 {
                     sBefore = sCurTime;
                     testTextBox.AppendText("---" +nBeforeCnt.ToString() + "\r\n");
+                    nBeforeRecord = nBeforeCnt;
+                    nTotalRecord -= nBeforeCnt;
+                    if (nTotalRecord < 0)
+                        nTotalRecord = 0;
+                    testTextBox.AppendText(nTotalRecord.ToString()+"\r\n");
                     nBeforeCnt = 0;
                 }
 
@@ -540,8 +549,9 @@ namespace MJTradier
                 {
                     testTextBox.AppendText("#########"+  nBeforeCnt2.ToString() + "\r\n");
                     nBeforeShared = nSharedTime;
+                    nBeforeRecord2 = nBeforeCnt2;
+                    nTotalRecord += nBeforeCnt2;
                     nBeforeCnt2 = 0;
-
                 }
 
 
