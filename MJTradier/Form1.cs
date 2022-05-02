@@ -533,26 +533,28 @@ namespace MJTradier
                 nBeforeCnt2++;
                 if (!sBefore.Equals(sCurTime))
                 {
+                    testTextBox.AppendText("##########################" + "\r\n");
                     sBefore = sCurTime;
-                    testTextBox.AppendText("---" +nBeforeCnt.ToString() + "\r\n");
-                    nBeforeRecord = nBeforeCnt;
-                    nTotalRecord -= nBeforeCnt;
-                    if (nTotalRecord < 0)
-                        nTotalRecord = 0;
-                    testTextBox.AppendText(nTotalRecord.ToString()+"\r\n");
-                    nBeforeCnt = 0;
+                    testTextBox.AppendText(SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");//삭제
+                    //testTextBox.AppendText("---" +nBeforeCnt.ToString() + "\r\n");
+                    //nBeforeRecord = nBeforeCnt;
+                    //nTotalRecord -= nBeforeCnt;
+                    //if (nTotalRecord < 0)
+                    //    nTotalRecord = 0;
+                    //testTextBox.AppendText(nTotalRecord.ToString()+"   " + SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");
+                    //nBeforeCnt = 0;
                 }
 
-                ////testTextBox.AppendText(SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");//삭제
+                //testTextBox.AppendText(SubTimeToTimeAndSec(int.Parse(sCurTime), nSharedTime).ToString() + " : " + sCurTime + " ," + nSharedTime.ToString() + "\r\n");//삭제
 
-                if (nBeforeShared != nSharedTime)
-                {
-                    testTextBox.AppendText("#########"+  nBeforeCnt2.ToString() + "\r\n");
-                    nBeforeShared = nSharedTime;
-                    nBeforeRecord2 = nBeforeCnt2;
-                    nTotalRecord += nBeforeCnt2;
-                    nBeforeCnt2 = 0;
-                }
+                //if (nBeforeShared != nSharedTime)
+                //{
+                //    testTextBox.AppendText("#########"+  nBeforeCnt2.ToString() + "\r\n");
+                //    nBeforeShared = nSharedTime;
+                //    nBeforeRecord2 = nBeforeCnt2;
+                //    nTotalRecord += nBeforeCnt2;
+                //    nBeforeCnt2 = 0;
+                //}
 
 
 
@@ -1192,7 +1194,7 @@ namespace MJTradier
                                 }
                             }
                         }
-
+                        
                         if (eachStockArray[nCurIdx].fMaxPower < eachStockArray[nCurIdx].fPower)
                         {
                             eachStockArray[nCurIdx].fMaxPower = eachStockArray[nCurIdx].fPower;
