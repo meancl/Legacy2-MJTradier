@@ -41,12 +41,17 @@
             this.axKHOpenAPI1 = new AxKHOpenAPILib.AxKHOpenAPI();
             this.testTextBox = new System.Windows.Forms.TextBox();
             this.setOnMarketButton = new System.Windows.Forms.Button();
+            this.depositCalcLabel = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.setDepositCalcButton = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.axKHOpenAPI1)).BeginInit();
             this.SuspendLayout();
             // 
             // groupBox1
             // 
+            this.groupBox1.Controls.Add(this.depositCalcLabel);
+            this.groupBox1.Controls.Add(this.label5);
             this.groupBox1.Controls.Add(this.checkMyHoldingsButton);
             this.groupBox1.Controls.Add(this.checkMyAccountInfoButton);
             this.groupBox1.Controls.Add(this.myNameLabel);
@@ -60,14 +65,14 @@
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Padding = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.groupBox1.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.groupBox1.Size = new System.Drawing.Size(317, 190);
+            this.groupBox1.Size = new System.Drawing.Size(317, 246);
             this.groupBox1.TabIndex = 2;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "내 정보";
             // 
             // checkMyHoldingsButton
             // 
-            this.checkMyHoldingsButton.Location = new System.Drawing.Point(200, 136);
+            this.checkMyHoldingsButton.Location = new System.Drawing.Point(200, 192);
             this.checkMyHoldingsButton.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.checkMyHoldingsButton.Name = "checkMyHoldingsButton";
             this.checkMyHoldingsButton.Size = new System.Drawing.Size(111, 23);
@@ -77,17 +82,17 @@
             // 
             // checkMyAccountInfoButton
             // 
-            this.checkMyAccountInfoButton.Location = new System.Drawing.Point(71, 136);
+            this.checkMyAccountInfoButton.Location = new System.Drawing.Point(82, 192);
             this.checkMyAccountInfoButton.Name = "checkMyAccountInfoButton";
             this.checkMyAccountInfoButton.Size = new System.Drawing.Size(109, 23);
             this.checkMyAccountInfoButton.TabIndex = 11;
-            this.checkMyAccountInfoButton.Text = "계좌정보확인";
+            this.checkMyAccountInfoButton.Text = "예수금확인";
             this.checkMyAccountInfoButton.UseVisualStyleBackColor = true;
             // 
             // myNameLabel
             // 
             this.myNameLabel.AutoSize = true;
-            this.myNameLabel.Location = new System.Drawing.Point(97, 63);
+            this.myNameLabel.Location = new System.Drawing.Point(122, 63);
             this.myNameLabel.Name = "myNameLabel";
             this.myNameLabel.Size = new System.Drawing.Size(41, 12);
             this.myNameLabel.TabIndex = 10;
@@ -105,7 +110,7 @@
             // myDepositLabel
             // 
             this.myDepositLabel.AutoSize = true;
-            this.myDepositLabel.Location = new System.Drawing.Point(97, 96);
+            this.myDepositLabel.Location = new System.Drawing.Point(122, 96);
             this.myDepositLabel.Name = "myDepositLabel";
             this.myDepositLabel.Size = new System.Drawing.Size(33, 12);
             this.myDepositLabel.TabIndex = 8;
@@ -123,7 +128,7 @@
             // accountComboBox
             // 
             this.accountComboBox.FormattingEnabled = true;
-            this.accountComboBox.Location = new System.Drawing.Point(99, 29);
+            this.accountComboBox.Location = new System.Drawing.Point(124, 32);
             this.accountComboBox.Name = "accountComboBox";
             this.accountComboBox.Size = new System.Drawing.Size(121, 20);
             this.accountComboBox.TabIndex = 1;
@@ -159,18 +164,46 @@
             // 
             // setOnMarketButton
             // 
-            this.setOnMarketButton.Location = new System.Drawing.Point(12, 357);
+            this.setOnMarketButton.Location = new System.Drawing.Point(12, 336);
             this.setOnMarketButton.Name = "setOnMarketButton";
-            this.setOnMarketButton.Size = new System.Drawing.Size(88, 42);
+            this.setOnMarketButton.Size = new System.Drawing.Size(109, 31);
             this.setOnMarketButton.TabIndex = 10;
             this.setOnMarketButton.Text = "강제 장시작";
             this.setOnMarketButton.UseVisualStyleBackColor = true;
+            // 
+            // depositCalcLabel
+            // 
+            this.depositCalcLabel.AutoSize = true;
+            this.depositCalcLabel.Location = new System.Drawing.Point(122, 125);
+            this.depositCalcLabel.Name = "depositCalcLabel";
+            this.depositCalcLabel.Size = new System.Drawing.Size(33, 12);
+            this.depositCalcLabel.TabIndex = 14;
+            this.depositCalcLabel.Text = "0(원)";
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(23, 125);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(77, 12);
+            this.label5.TabIndex = 13;
+            this.label5.Text = "계산용예수금";
+            // 
+            // setDepositCalcButton
+            // 
+            this.setDepositCalcButton.Location = new System.Drawing.Point(12, 384);
+            this.setDepositCalcButton.Name = "setDepositCalcButton";
+            this.setDepositCalcButton.Size = new System.Drawing.Size(109, 29);
+            this.setDepositCalcButton.TabIndex = 15;
+            this.setDepositCalcButton.Text = "계산용예수금확인";
+            this.setDepositCalcButton.UseVisualStyleBackColor = true;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(951, 496);
+            this.Controls.Add(this.setDepositCalcButton);
             this.Controls.Add(this.setOnMarketButton);
             this.Controls.Add(this.testTextBox);
             this.Controls.Add(this.axKHOpenAPI1);
@@ -199,6 +232,9 @@
         private System.Windows.Forms.Button checkMyHoldingsButton;
         private System.Windows.Forms.TextBox testTextBox;
         private System.Windows.Forms.Button setOnMarketButton;
+        private System.Windows.Forms.Label depositCalcLabel;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Button setDepositCalcButton;
     }
 }
 

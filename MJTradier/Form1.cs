@@ -76,6 +76,7 @@ namespace MJTradier
         public string sAccountNum; // 계좌번호
         public int nSharedTime; // 모든 종목들이 공유하는 현재시간
         public int nCurDeposit;  // 현재 예수금
+        public int nCurDepositCalc; // 계산하기 위한 예수금
         public int nShutDown; // 장마감이 되면 양수가 됨.
         public bool isForCheckHoldings; // 현재잔고를 확인만 하기위한 기능
         public int nFirstDisposal; // 장시작이 되면 매도체크, only one chance: nFirstDisposal == 0
@@ -129,7 +130,7 @@ namespace MJTradier
             checkMyAccountInfoButton.Click += Button_Click; 
             checkMyHoldingsButton.Click += Button_Click;
             setOnMarketButton.Click += Button_Click;//삭제
-
+            setDepositCalcButton.Click += Button_Click;//삭제
             // --------------------------------------------------
             // Event Handler 
             // --------------------------------------------------
@@ -166,6 +167,11 @@ namespace MJTradier
             {
                 isMarketStart = true;
                 testTextBox.AppendText("강제 장시작 완료\r\n"); //++
+            }
+            else if(sender.Equals(setDepositCalcButton))
+            {
+                depositCalcLabel.Text = nCurDepositCalc.ToString() + "(원)";
+                testTextBox.AppendText("계산용예수금 세팅 완료\r\n"); //++
             }
         }
         
@@ -400,7 +406,6 @@ namespace MJTradier
                 nHoldingCnt = 0;
                 nCurHoldingsIdx = 0;
             }
-            SetTrScreenNo();
             axKHOpenAPI1.SetInputValue("계좌번호", sAccountNum);
             axKHOpenAPI1.SetInputValue("비밀번호", "");
             axKHOpenAPI1.SetInputValue("비밀번호입력매체구분", "00");
@@ -440,7 +445,13 @@ namespace MJTradier
             if (e.sRQName.Equals("예수금상세현황요청"))
             {
                 nCurDeposit = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "주문가능금액")));
-                isDepositSet = true;
+                if (!isDepositSet)
+                {
+                    nCurDepositCalc = nCurDeposit;
+                    depositCalcLabel.Text = nCurDepositCalc.ToString() + "(원)";
+                    testTextBox.AppendText("계산용예수금 세팅 완료\r\n"); //++
+                    isDepositSet = true;
+                }
                 testTextBox.AppendText("예수금 세팅 완료\r\n"); //++
                 myDepositLabel.Text = nCurDeposit.ToString() + "(원)";
             }
@@ -603,7 +614,7 @@ namespace MJTradier
 
                                         double fCurLimitPriceFee = (nEstimatedPrice * (1 + VIRTUAL_STOCK_FEE));
 
-                                        int nNumToBuy = (int)(nCurDeposit / fCurLimitPriceFee); // 현재 예수금으로 살 수 있을 만큼
+                                        int nNumToBuy = (int)(nCurDepositCalc / fCurLimitPriceFee); // 현재 예수금으로 살 수 있을 만큼
                                         int nMaxNumToBuy = (int)(nMaxPriceForEachStock / fCurLimitPriceFee); // 최대매수가능금액으로 살 수 있을 만큼
 
                                         if (nNumToBuy > nMaxNumToBuy) // 최대매수가능수를 넘는다면
@@ -1347,7 +1358,7 @@ namespace MJTradier
                             return;
                         }
                         // 예수금에 지정상한가와 매입금액과의 차이만큼을 다시 복구시켜준다.
-                        nCurDeposit += (eachStockArray[nCurIdx].nCurLimitPrice - nCurOkTradePrice) * nCurOkTradeVolume; // 예수금에 (추정매수가 - 실매수가) * 실매수량 더해준다. //**
+                        nCurDepositCalc += (eachStockArray[nCurIdx].nCurLimitPrice - nCurOkTradePrice) * nCurOkTradeVolume; // 예수금에 (추정매수가 - 실매수가) * 실매수량 더해준다. //**
 
                         // 이것은 현재매수 구간이기 떄문에
                         // 해당레코드의 평균매입가와 매수수량을 조정하기 위한 과정이다
@@ -1393,7 +1404,7 @@ namespace MJTradier
                             eachStockArray[nCurIdx].sCurOrgOrderId = sOrderId; // 현재원주문번호 설정
                             eachStockArray[nCurIdx].isOrderStatus = true; // 매매중 on
 
-                            nCurDeposit -= (int)(nOrderVolume * eachStockArray[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)); // 예수금에서 매매수수료까지 포함해서 차감
+                            nCurDepositCalc -= (int)(nOrderVolume * eachStockArray[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)); // 예수금에서 매매수수료까지 포함해서 차감
 
                             testTextBox.AppendText(sTradeTime + " : " + sCode + ", " + nOrderVolume.ToString() + "(주) 매수 접수완료 \r\n"); //++
                                                                                                                            //---------------------------------------------
@@ -1415,7 +1426,7 @@ namespace MJTradier
                 {
                     if (sOrderStatus.Equals("체결")) 
                     {
-                        nCurDeposit += (int)(Math.Abs(int.Parse(sCurOkTradeVolume)) * Math.Abs(int.Parse(sCurOkTradePrice)) * (1-(STOCK_TAX + VIRTUAL_STOCK_FEE))); //**
+                        nCurDepositCalc += (int)(Math.Abs(int.Parse(sCurOkTradeVolume)) * Math.Abs(int.Parse(sCurOkTradePrice)) * (1-(STOCK_TAX + VIRTUAL_STOCK_FEE))); //**
 
                         if (nNoTradeVolume == 0)
                         {
@@ -1459,7 +1470,7 @@ namespace MJTradier
                         // 매수취소 수량과 미체결량을 검사해준다.
                         if ( nNoTradeVolume < nOrderVolume  && nOrderVolume > 0) // 매수취소된 수량이 있다면
                         {
-                            nCurDeposit += (int)((nOrderVolume - nNoTradeVolume) * (eachStockArray[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)));
+                            nCurDepositCalc += (int)((nOrderVolume - nNoTradeVolume) * (eachStockArray[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)));
                         }
                         
                     }
