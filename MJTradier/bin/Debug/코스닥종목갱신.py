@@ -12,7 +12,7 @@ for idx, stk in enumerate(kospi_df):
     df = stock.get_market_ohlcv(dtype_yesterday,dtype_yesterday,stk)
     stock_info_list.append([stk, df['거래량'].iat[0]])
 
-n_sep = 1000
+n_sep =  1500
 stock_info_list.sort(key= lambda x:-x[1])
 sep_kospi_df = stock_info_list[:n_sep]
 

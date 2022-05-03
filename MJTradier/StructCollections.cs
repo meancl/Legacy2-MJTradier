@@ -12,7 +12,7 @@
             // ----------------------------------
             public string sRealScreenNum;
             public string sCode;
-            public int nMarketGubun; // 1이면 코스닥, 2이면 코스피
+            public int nMarketGubun; // 0이면 코스닥, 1이면 코스피
 
             // ----------------------------------
             // 초기 변수
@@ -25,10 +25,8 @@
             // ----------------------------------
             // 실시간체결 변수
             // ----------------------------------
-            public int nTime;
             public int nFs;
             public int nFb;
-            public int nTv;
             public int nIdx;
             public double fPower;
 
@@ -48,25 +46,17 @@
             // ----------------------------------
             // 매매관련 변수
             // ----------------------------------
-            public int nCurOrderType; // 1:신규매수 2:신규매도 3:매수취소 4:매도취소 5:매수정정 6:매도정정
             public int nCurLimitPrice; // 지정가가 estimatedPrice를 초과하는 미체결 수량이 남았다면 처분하기 위한 변수
-            public int nCurOrderPrice; // 매수주문했을때의 최우선매도호가
             public int nCurRqTime; // 매수주문했을때의 시간
             public bool isOrderStatus; // 현재 매매중인 지 확인하는 변수;
             public string sCurOrgOrderId; // 원주문번호   default:""
-            public string sCurOrgBuyId;  // 매수취소,정정용 원주문번호
-            public string sCurOrgSellId; // 매도취소,정정용 원주문번호
-
-
             public int nBuyReqCnt; // 현재 종목의 매수신청카운트
             public int nSellReqCnt; // 현재 종목의 매도신청카운트 
             public bool isCancelMode; // 현재 매수에서 매수취소가 나왔으면 더이상의 현재의 거래에서 매수취소요청을 금지하기 위한 변수
             public bool isCancelComplete; // 매수취소가 성공한 경우를 판별하는 변수
-            public int nCurBuySlotIdx; // 매도신청 실패 시 매도모드를 취소해야하기 위한 변수
             public int nHoldingsCnt; // 보유종목수
             public double fTargetPercent; // 익절 퍼센트
             public double fBottomPercent; // 손절 퍼센트
-            
             
         }
 
@@ -78,12 +68,10 @@
         public struct TradeSlot
         {
             public int nRqTime; // 주문요청시간
-
-
-            public double fTargetPercent; // 익절 퍼센트 //TODAY
-            public double fBottomPercent; // 손절 퍼센트 //TODAY
-            public int nEachStockIdx; // 개인구조체인덱스 //TODAY
-            public int nBuySlotIdx; // 구매열람인덱스 //TODAY
+            public double fTargetPercent; // 익절 퍼센트 
+            public double fBottomPercent; // 손절 퍼센트 
+            public int nEachStockIdx; // 개인구조체인덱스
+            public int nBuySlotIdx; // 구매열람인덱스 , 매도요청이 실패하면 해당인덱스를 통해 다시 요청할 수 있게 하기 위한 변수
             // ----------------------------------
             // SendOrder 인자들
             // ----------------------------------
@@ -96,8 +84,6 @@
             public int nOrderPrice; // 주문가격
             public string sHogaGb; // 거래구분 (00:지정가, 03:시장가, ...)
             public string sOrgOrderId;  // 원주문번호. 신규주문에는 공백 입력, 정정/취소시 입력합니다.
-
-            
         }
 
         // ============================================
