@@ -1,0 +1,1425 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using System.Windows.Forms;
+
+// ========================================================================
+// 철학 : Being simple is the best.
+// ========================================================================
+namespace MJTradier
+{
+    public partial class Form1 : Form
+    {
+        // ------------------------------------------------------
+        // 상수 변수
+        // ------------------------------------------------------
+        public const long ONE_TRILLION = 1000000000000;
+        public const long HUNDRED_BILLION = 100000000000;
+        public const long TEN_BILLION = 10000000000;
+        public const int BILLION = 1000000000;
+        public const int TWENTY_MILLION = 20000000;
+        public const int TEN_MILLION = 10000000;
+        public const int FIVE_MILLION = 5000000;
+        public const int MILLION = 1000000;
+        private const byte KOSDAQ_ID = 0;  // 코스닥을 증명하는 상수
+        private const byte KOSPI_ID = 1; // 코스피를 증명하는 상수
+        private const int MAX_STOCK_NUM = 1000000; // 최종주식종목 수 0 ~ 999999 
+        public const int NUM_SEP_PER_SCREEN = 100; // 한 화면번호 당 가능요청 수
+        public const double STOCK_TAX = 0.0023; // 거래세 
+        public const double STOCK_FEE = 0.00015; // 증권 매매 수수료
+        public const double VIRTUAL_STOCK_FEE = 0.0035; // 증권 매매 수수료
+        public const int MAX_STOCK_HOLDINGS_NUM = 200; // 보유주식을 저장하는 구조체 최대 갯수
+        public const int EYES_CLOSE_NUM = 3; // 현재가에서 EYES_CLOSE_NUM 스텝만큼 가격을 올려 지정가에 두기 위한 스텝 변수
+        public const int SHUTDOWN_TIME = 150000; // 마감시간
+        public const int BAN_BUY_TIME = 144000; // 매수 종료시간
+        public const int IGNORE_REQ_SEC = 10; // 요청무시용 seconds 변수
+        public const int NEW_BUY = 1;
+        public const int NEW_SELL = 2;
+        public const int BUY_CANCEL = 3;
+        public const int SELL_CANCEL = 4;
+        public const int BUY_UPDATE = 5;
+        public const int SELL_UPDATE = 6;
+
+
+        // ------------------------------------------------------
+        // 각 종목 구조체 변수
+        // ------------------------------------------------------
+        private int nEachStockIdx; // 개인구조체의 인덱스를 설정하기 위한 변수 0부터 시작
+        private int[] eachStockIdxArray; // 개인구조체의 인덱스를 저장한 배열  //초기화대상
+        EachStock[] ea;  // 각 주식이 가지는 실시간용 구조체(개인구조체) //초기화대상
+        public int nCurIdx; // 현재 개인구조체의 인덱스
+
+        // ------------------------------------------------------
+        // 기타 변수
+        // ------------------------------------------------------
+        public char[] charsToTrim = { '+', '-', ' ' };
+        public bool isDepositSet; // 예수금이 세팅돼있는 지 확인하는 변수
+        public int nStockLength;
+        // ------------------------------------------------------
+        // 스크린번호 변수
+        // ------------------------------------------------------
+        public const int REAL_SCREEN_NUM_START = 1000; // 실시간 시작화면번호
+        public const int REAL_SCREEN_NUM_END = 1100; // 실시간 마지막화면번호
+        public const int TR_SCREEN_NUM_START = 1101; // TR 초기화면번호
+        public const int TR_SCREEN_NUM_END = 2000; // TR 마지막화면번호
+        public const int TRADE_SCREEN_NUM_START = 2001; // 매매 시작화면번호 
+        public const int TRADE_SCREEN_NUM_END = 9999; // 매매 마지막화면전호
+
+        private int nTrScreenNum = TR_SCREEN_NUM_START;
+        private int nRealScreenNum = REAL_SCREEN_NUM_START;
+        private int nTradeScreenNum = TRADE_SCREEN_NUM_START;
+
+        // ------------------------------------------------------
+        // 종목획득 변수
+        // ------------------------------------------------------
+        // private string sConfigurationPath = @"D:\MJ\stock\getData\kiwoom\"; // 코스피, 코스닥 종목을 저장해놓은 파일의 디렉터리 경로
+        private static string sBasicInfoPath = @"기본정보\";
+        private static string sMessageLogPath = @"로그\";
+        private string[] kosdaqCodes; // 코스닥 종목들을 저장한 문자열 배열 //초기화대상
+        private string[] kospiCodes; //  코스피 종목들을 저장한 문자열 배열 //초기화대상
+
+
+        // ------------------------------------------------------
+        // 공유 변수
+        // ------------------------------------------------------
+        public bool isMarketStart; // true면 장중, false면 장시작전,장마감후
+        public string sAccountNum; // 계좌번호
+        public int nSharedTime; // 모든 종목들이 공유하는 현재시간
+        public int nCurDeposit;  // 현재 예수금
+        public int nCurDepositCalc; // 계산하기 위한 예수금
+        public int nShutDown; // 장마감이 되면 양수가 됨.
+        public bool isForCheckHoldings; // 현재잔고를 확인만 하기위한 기능
+        public int nFirstDisposal; // 장시작이 되면 매도체크, only one chance: nFirstDisposal == 0
+        public int nTimeSep = 100;
+
+        // ------------------------------------------------------
+        // 매매관련 변수
+        // ------------------------------------------------------
+        public int nMaxPriceForEachStock = 3000000;   // 각 종목이 한번에 최대 살 수 있는 금액 ex. 삼백만원
+        public Queue<TradeSlot> tradeQueue = new Queue<TradeSlot>(); // 매매신청을 담는 큐, 매매컨트롤러가 사용할 큐 
+        TradeSlot curSlot; // 임시로 사용하능한 매매요청, 매매컨트롤러 변수
+        public const int MAX_REQ_SEC = 600;
+
+        //--------------------------------------------------------
+        // 계좌평가잔고내역요청 변수
+        //--------------------------------------------------------
+        public Holdings[] holdingsArray = new Holdings[MAX_STOCK_HOLDINGS_NUM]; // 현재 보유주식을 담을 구조체 배열 
+        public int nHoldingCnt; // 총 보유주식의 수
+        public int nCurHoldingsIdx; // 보유주식을 담을때 사용하는 인덱스 변수 
+
+
+        //--------------------------------------------------------
+        // 개인구조체 매수슬롯 변수
+        //--------------------------------------------------------
+        public const int BUY_SLOT_NUM = 50;
+        public const int BUY_LIMIT_NUM = 10;
+        public BuySlot[,] buySlotArray; //초기화대상
+        public int[] buySlotCntArray; //초기화대상
+
+        //--------------------------------------------------------
+        // 주문제한횟수 관련 변수
+        //--------------------------------------------------------
+        public DateTime dtBeforeOrderTime;
+        public DateTime dtCurOrderTime;
+        
+        public int nReqestCount;
+        public const int LIMIT_SENDORDER_NUM = 5;
+        public bool isSendOrder;
+        public bool isForbidTrade;
+
+        public int nFirstTime;
+
+        public const int nUpdateTime = 20;
+        public const double fPushWeight = 0.8;
+
+        public StreamReader sr;
+        public int srCnt;
+
+        
+
+       
+        public Form1()
+        {
+
+
+            InitializeComponent(); // c# 고유 고정메소드  
+
+            MappingFileToStockCodes();
+            dtBeforeOrderTime = DateTime.Now; // 이전요청시간 초기화
+
+            // --------------------------------------------------
+            // Winform Event Handler 
+            // --------------------------------------------------
+            checkMyAccountInfoButton.Click += Button_Click;
+            checkMyHoldingsButton.Click += Button_Click;
+            setOnMarketButton.Click += Button_Click;//삭제
+            setDepositCalcButton.Click += Button_Click;//삭제
+            // --------------------------------------------------
+            // Event Handler 
+            // --------------------------------------------------
+            axKHOpenAPI1.OnEventConnect += OnEventConnectHandler; // 로그인 event slot connect
+            axKHOpenAPI1.OnReceiveTrData += OnReceiveTrDataHandler; // TR event slot connect
+            axKHOpenAPI1.OnReceiveRealData += OnReceiveRealDataHandler; // 실시간 event slot connect
+            axKHOpenAPI1.OnReceiveChejanData += OnReceiveChejanDataHandler; // 체결,접수,잔고 event slot connect
+
+            testTextBox.AppendText("로그인 시도..\r\n"); //++
+            axKHOpenAPI1.CommConnect();
+        }
+
+
+        // ============================================
+        // 버튼 클릭 이벤트의 핸들러 메소드
+        // 1. 예수금상세현황요청
+        // 2. 계좌평가잔고내역요청
+        // 3. (테스트용) 강제 장시작 버튼
+        // 4. (테스트용) 계산용 예수금 세팅
+        // ============================================
+        private void Button_Click(object sender, EventArgs e)
+        {
+
+            if (sender.Equals(checkMyAccountInfoButton)) // 예수금상세현황요청
+            {
+                RequestDeposit();
+            }
+            else if (sender.Equals(checkMyHoldingsButton)) // 계좌평가현황요청 
+            {
+                isForCheckHoldings = true;
+                RequestHoldings(0);
+            }
+            else if (sender.Equals(setOnMarketButton))//삭제
+            {
+                isMarketStart = true;
+                testTextBox.AppendText("강제 장시작 완료\r\n"); //++
+            }
+            else if (sender.Equals(setDepositCalcButton))
+            {
+                depositCalcLabel.Text = nCurDepositCalc.ToString() + "(원)";
+                testTextBox.AppendText("계산용예수금 세팅 완료\r\n"); //++
+            }
+        }
+
+
+
+
+
+        // ============================================
+        // 주식종목들을 특정 txt파일에서 읽어
+        // 코스닥, 코스피 변수에 string[] 형식으로 각각 저장
+        // 코스닥, 코스피 종목갯수의 합만큼의 eachStockArray구조체 배열을 생성
+        // ============================================
+        private void MappingFileToStockCodes()
+        {
+            kosdaqCodes = System.IO.File.ReadAllLines("today_kosdaq_stock_code.txt");
+            kospiCodes = System.IO.File.ReadAllLines("today_kospi_stock_code.txt");
+
+            //kosdaqCodes = new string[0];
+            //kospiCodes = new string[0];
+
+            testTextBox.AppendText("Kosdaq : " + kosdaqCodes.Length.ToString() + "\r\n"); //++
+            testTextBox.AppendText("Kospi : " + kospiCodes.Length.ToString() + "\r\n"); //++
+
+            nStockLength = kosdaqCodes.Length + kospiCodes.Length;
+
+            eachStockIdxArray = new int[MAX_STOCK_NUM];
+            ea = new EachStock[nStockLength];
+            buySlotArray = new BuySlot[nStockLength, BUY_SLOT_NUM]; // ex. [1600, 50]
+            buySlotCntArray = new int[nStockLength]; // ex. [1600]
+        }
+
+        public void Delay(int ms)
+        {
+            DateTime dateTimeNow = DateTime.Now;
+            TimeSpan duration = new TimeSpan(0, 0, 0, 0, ms);
+            DateTime dateTimeAdd = dateTimeNow.Add(duration);
+            while (dateTimeAdd >= dateTimeNow)
+            {
+                System.Windows.Forms.Application.DoEvents();
+                dateTimeNow = DateTime.Now;
+            }
+            return;
+        }
+
+
+        // ============================================
+        // 매매용 화면번호 재설정 메소드
+        // ============================================
+        private string SetTradeScreenNo()
+        {
+            if (nTradeScreenNum > TRADE_SCREEN_NUM_END)
+                nTradeScreenNum = TRADE_SCREEN_NUM_START;
+
+            string sTradeScreenNum = nTradeScreenNum.ToString();
+            nTradeScreenNum++;
+            return sTradeScreenNum;
+
+        }
+
+        // ============================================
+        // 실시간용 화면번호 재설정 메소드
+        // ============================================
+        private string SetRealScreenNo()
+        {
+            if (nRealScreenNum > REAL_SCREEN_NUM_END)
+                nRealScreenNum = REAL_SCREEN_NUM_START;
+
+            string sRealScreenNum = nRealScreenNum.ToString();
+            nRealScreenNum++;
+            return sRealScreenNum;
+        }
+
+
+        // ============================================
+        // Tr용 화면번호 재설정메소드
+        // ============================================
+        private string SetTrScreenNo()
+        {
+            if (nTrScreenNum > TR_SCREEN_NUM_END)
+                nTrScreenNum = TR_SCREEN_NUM_START;
+
+            string sTrScreenNum = nTrScreenNum.ToString();
+            nTrScreenNum++;
+            return sTrScreenNum;
+        }
+
+
+
+
+        // ============================================
+        // string형  코스닥, 코스피 종목코드의 배열 string[n] 변수에서
+        // 한 화면번호 당 (최대)100개씩 넣고 주식체결 fid를 넣고
+        // 실시간 데이터 요청을 진행
+        // 코스닥과 코스피 배열에서 100개가 안되는 나머지 종목들은 코스닥,코스피 각 다른 화면번호에 실시간 데이터 요청
+        // ============================================
+        private void SubscribeRealData()
+        {
+            testTextBox.AppendText("구독 시작..\r\n"); //++
+            int kosdaqIndex = 0;
+            int kosdaqCodesLength = kosdaqCodes.Length;
+            int kosdaqIterNum = kosdaqCodesLength / NUM_SEP_PER_SCREEN;
+            int kosdaqRestNum = kosdaqCodesLength % NUM_SEP_PER_SCREEN;
+            string strKosdaqCodeList;
+            const string sFID = "41;228"; // 체결강도. 실시간 목록 FID들 중 겹치는게 가장 적은 FID
+            string sScreenNum;
+            // ------------------------------------------------------
+            // 코스닥 실시간 등록
+            // ------------------------------------------------------
+            // 100개 단위
+            for (int kosdaqIterIdx = 0; kosdaqIterIdx < kosdaqIterNum; kosdaqIterIdx++)
+            {
+                sScreenNum = SetRealScreenNo();
+                strKosdaqCodeList = ConvertStrCodeList(kosdaqCodes, kosdaqIndex, kosdaqIndex + NUM_SEP_PER_SCREEN, KOSDAQ_ID, sScreenNum);
+                axKHOpenAPI1.SetRealReg(sScreenNum, strKosdaqCodeList, sFID, "0");
+                kosdaqIndex += NUM_SEP_PER_SCREEN;
+            }
+            // 나머지
+            if (kosdaqRestNum > 0)
+            {
+                sScreenNum = SetRealScreenNo();
+                strKosdaqCodeList = ConvertStrCodeList(kosdaqCodes, kosdaqIndex, kosdaqIndex + kosdaqRestNum, KOSDAQ_ID, sScreenNum);
+                axKHOpenAPI1.SetRealReg(sScreenNum, strKosdaqCodeList, sFID, "0");
+            }
+
+            int kospiIndex = 0;
+            int kospiCodesLength = kospiCodes.Length;
+            int kospiIterNum = kospiCodesLength / NUM_SEP_PER_SCREEN;
+            int kospiRestNum = kospiCodesLength % NUM_SEP_PER_SCREEN;
+            string strKospiCodeList;
+
+            // ------------------------------------------------------
+            // 코스피 실시간 등록
+            // ------------------------------------------------------
+            // 100개 단위
+            for (int kospiIterIdx = 0; kospiIterIdx < kospiIterNum; kospiIterIdx++)
+            {
+                sScreenNum = SetRealScreenNo();
+                strKospiCodeList = ConvertStrCodeList(kospiCodes, kospiIndex, kospiIndex + NUM_SEP_PER_SCREEN, KOSPI_ID, sScreenNum);
+                axKHOpenAPI1.SetRealReg(sScreenNum, strKospiCodeList, sFID, "0");
+                kospiIndex += NUM_SEP_PER_SCREEN;
+            }
+            // 나머지
+            if (kospiRestNum > 0)
+            {
+                sScreenNum = SetRealScreenNo();
+                strKospiCodeList = ConvertStrCodeList(kospiCodes, kospiIndex, kospiIndex + kospiRestNum, KOSPI_ID, sScreenNum);
+                axKHOpenAPI1.SetRealReg(sScreenNum, strKospiCodeList, sFID, "0");
+            }
+            testTextBox.AppendText("구독 완료..\r\n"); //++
+        }
+
+
+
+
+        // ============================================
+        // 매개변수 : 
+        //  1.  string[] codes : 주식종목코드 배열
+        //  2.  s : 배열의 시작 인덱스
+        //  3.  e : 배열의 끝 인덱스 (포함 x)
+        //  4.  marketGubun : 코스닥, 코스피 구별변수
+        //  5.  sScreenNum : 실시간 화면번호
+        //
+        // 키움 실시간 신청메소드의 두번째 인자인 strCodeList는
+        // 종목코드1;종목코드2;종목코드3;....;종목코드n(;마지막은 생략가능) 형식으로 넘겨줘야하기 때문에
+        // s부터 e -1 인덱스까지 string 변수에 추가하며 사이사이 ';'을 붙여준다
+        //
+        // 실시간메소드에서 각 종목의 구조체를 사용하기 위해 초기화과정이 필요한데
+        // 이 메소드에서 같이 진행해준다.
+        // ============================================
+        private string ConvertStrCodeList(string[] codes, int s, int e, int marketGubun, string sScreenNum)
+        {
+            string sCodeList = "";
+            string sEachBasicInfo;
+            string[] sBasicInfoSplited;
+
+            for (int j = s; j < e; j++)
+            {
+                int codeIdx = int.Parse(codes[j]);
+
+                // TODO. Map(java) 기능과 속도 비교 후 수정 예정
+                ////// eachStockIdx 설정 부분 ///////
+                eachStockIdxArray[codeIdx] = nEachStockIdx;
+                nEachStockIdx++;
+                /////////////////////////////////////
+
+                ////// eachStock 초기화 부분 ////////// 
+                nCurIdx = eachStockIdxArray[codeIdx];
+                ea[nCurIdx].sRealScreenNum = sScreenNum;
+                ea[nCurIdx].sCode = codes[j];
+                ea[nCurIdx].nMarketGubun = marketGubun;
+                if (ea[nCurIdx].nMarketGubun == KOSPI_ID)
+                    ea[nCurIdx].sMarketGubunTag = "KOSPI";
+                else
+                    ea[nCurIdx].sMarketGubunTag = "KOSDAQ";
+
+                bool isEmpty = false;
+                try
+                {
+                    sr = new StreamReader(sBasicInfoPath + codes[j] + ".txt");
+                    sEachBasicInfo = sr.ReadLine();
+                    isEmpty = true;
+                    sBasicInfoSplited = sEachBasicInfo.Split(',');
+
+                    ea[nCurIdx].sCodeName = sBasicInfoSplited[0];
+                    ea[nCurIdx].lShareOutstanding = long.Parse(sBasicInfoSplited[1]);
+                    ea[nCurIdx].lTotalNumOfStock = long.Parse(sBasicInfoSplited[2]);
+                    ea[nCurIdx].nYesterdayEndPrice = Math.Abs(int.Parse(sBasicInfoSplited[3]));
+
+                    sr.Close();
+                }
+                catch (Exception ex)
+                {
+                    if (isEmpty)
+                        sr.Close();
+                    srCnt += 1;
+                    RequestBasicStockInfo(codes[j]);
+                    testTextBox.AppendText(codes[j] + " 종목은 기존파일이 없어서 " + srCnt.ToString() + "번째 TR요청\r\n");
+                    Delay(1000);
+                }
+
+                string sDate = DateTime.Now.ToString("yyyy-MM-dd"); //삭제예정
+
+                sCodeList += codes[j];
+                if (j < e - 1)
+                    sCodeList += ';';
+            }
+            return sCodeList;
+        }
+
+
+
+
+        // ============================================
+        // 로그인 이벤트발생시 핸들러 메소드
+        // ============================================
+        private void OnEventConnectHandler(object sender, AxKHOpenAPILib._DKHOpenAPIEvents_OnEventConnectEvent e)
+        {
+            if (e.nErrCode == 0) // 로그인 성공
+            {
+
+
+
+                testTextBox.AppendText("로그인 성공\r\n"); //++
+                string sMyName = axKHOpenAPI1.GetLoginInfo("USER_NAME");
+                string sAccList = axKHOpenAPI1.GetLoginInfo("ACCLIST"); // 로그인 사용자 계좌번호 리스트 요청
+                string[] accountArray = sAccList.Split(';');
+
+                sAccountNum = accountArray[0]; // 처음계좌가 main계좌
+                accountComboBox.Text = sAccountNum;
+                SubscribeRealData(); // 실시간 구독 
+                RequestDeposit(); // 예수금상세현황요청 
+
+
+                foreach (string sAccount in accountArray)
+                {
+                    if (sAccount.Length > 0)
+                        accountComboBox.Items.Add(sAccount);
+                }
+                myNameLabel.Text = sMyName;
+
+            }
+            else
+            {
+                MessageBox.Show("로그인 실패");
+            }
+        } // END ---- 로그인 이벤트 핸들러
+
+
+
+
+
+        // ============================================
+        // 계좌평가잔고내역요청 TR요청메소드
+        // CommRqData 3번째 인자 sPrevNext가 0일 경우 처음 20개의 종목을 요청하고
+        // 2일 경우 초기20개 초과되는 종목들을 계속해서 요청한다.
+        // ============================================
+        private void RequestHoldings(int sPrevNext)
+        {
+            if (sPrevNext == 0)
+            {
+                nHoldingCnt = 0;
+                nCurHoldingsIdx = 0;
+            }
+            axKHOpenAPI1.SetInputValue("계좌번호", sAccountNum);
+            axKHOpenAPI1.SetInputValue("비밀번호", "");
+            axKHOpenAPI1.SetInputValue("비밀번호입력매체구분", "00");
+            axKHOpenAPI1.SetInputValue("조회구분", "2"); // 1:합산 2:개별
+            axKHOpenAPI1.CommRqData("계좌평가잔고내역요청", "opw00018", sPrevNext, SetTrScreenNo());
+        }
+
+
+        // ============================================
+        // 예수금상세현황요청 TR요청메소드
+        // ============================================
+        private void RequestDeposit()
+        {
+            axKHOpenAPI1.SetInputValue("계좌번호", sAccountNum);
+            axKHOpenAPI1.SetInputValue("비밀번호", "");
+            axKHOpenAPI1.SetInputValue("비밀번호입력매체구분", "00");
+            axKHOpenAPI1.SetInputValue("조회구분", "2");
+            axKHOpenAPI1.CommRqData("예수금상세현황요청", "opw00001", 0, SetTrScreenNo());
+        }
+
+        // ============================================
+        // 당일실현손익상세요청 TR요청메소드
+        // ============================================
+        private void RequestTradeResult()
+        {
+            axKHOpenAPI1.SetInputValue("계좌번호", sAccountNum);
+            axKHOpenAPI1.SetInputValue("비밀번호", "");
+            axKHOpenAPI1.SetInputValue("종목코드", "");
+            axKHOpenAPI1.CommRqData("당일실현손익상세요청", "opt10077", 0, SetTrScreenNo());
+        }
+
+        // ============================================
+        // 주식기본정보요청 TR요청메소드
+        // ============================================
+        private void RequestBasicStockInfo(string sCode)
+        {
+            axKHOpenAPI1.SetInputValue("종목코드", sCode);
+            axKHOpenAPI1.CommRqData("주식기본정보요청", "opt10001", 0, SetTrScreenNo());
+        }
+
+        // ============================================
+        // TR 이벤트발생시 핸들러 메소드
+        // ============================================
+        private void OnReceiveTrDataHandler(object sender, AxKHOpenAPILib._DKHOpenAPIEvents_OnReceiveTrDataEvent e)
+        {
+            if (e.sRQName.Equals("예수금상세현황요청"))
+            {
+                nCurDeposit = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "주문가능금액")));
+                if (!isDepositSet)
+                {
+                    nCurDepositCalc = nCurDeposit;
+                    depositCalcLabel.Text = nCurDepositCalc.ToString() + "(원)";
+                    testTextBox.AppendText("계산용예수금 세팅 완료\r\n"); //++
+                    isDepositSet = true;
+                }
+                testTextBox.AppendText("예수금 세팅 완료\r\n"); //++
+                myDepositLabel.Text = nCurDeposit.ToString() + "(원)";
+            }
+            else if (e.sRQName.Equals("계좌평가잔고내역요청"))
+            {
+                int rows = axKHOpenAPI1.GetRepeatCnt(e.sTrCode, e.sRecordName);
+                nHoldingCnt += rows;
+
+                for (int myMoneyIdx = 0; nCurHoldingsIdx < nHoldingCnt; nCurHoldingsIdx++, myMoneyIdx++)
+                {
+                    holdingsArray[nCurHoldingsIdx].sCode = axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "종목번호").Trim().Substring(1);
+                    holdingsArray[nCurHoldingsIdx].sCodeName = axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "종목명").Trim();
+                    holdingsArray[nCurHoldingsIdx].fYield = double.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "수익률(%)"));
+                    holdingsArray[nCurHoldingsIdx].nHoldingQty = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "보유수량")));
+                    holdingsArray[nCurHoldingsIdx].nBuyedPrice = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "매입가")));
+                    holdingsArray[nCurHoldingsIdx].nCurPrice = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "현재가")));
+                    holdingsArray[nCurHoldingsIdx].nTotalPL = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "평가손익")));
+                    holdingsArray[nCurHoldingsIdx].nNumPossibleToSell = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, myMoneyIdx, "매매가능수량")));
+                }
+
+                if (e.sPrevNext.Equals("2"))
+                {
+                    RequestHoldings(2);
+                }
+                else // 보유잔고 확인 끝
+                {
+                    if (isForCheckHoldings)
+                    {
+                        isForCheckHoldings = false;
+                        if (nHoldingCnt == 0)
+                        {
+                            testTextBox.AppendText("현재 보유종목이 없습니다.\r\n");//++
+                        }
+                        else
+                        {
+                            for (int myStockIdx = 0; myStockIdx < nHoldingCnt; myStockIdx++)
+                            {
+                                testTextBox.AppendText((myStockIdx + 1).ToString() + " 종목번호 : " + holdingsArray[myStockIdx].sCode + ", 종목명 : " + holdingsArray[myStockIdx].sCodeName + ", 보유수량 : " + holdingsArray[myStockIdx].nHoldingQty.ToString() + ", 평가손익 : " + holdingsArray[myStockIdx].nTotalPL.ToString() + "\r\n"); //++
+                            }
+                        }
+                    }
+                    else if ((nFirstDisposal == 0) || (nShutDown > 0))
+                    {
+                        nFirstDisposal++;
+
+                        if (nHoldingCnt == 0)
+                        {
+                            testTextBox.AppendText("현재 보유종목이 없습니다.\r\n");//++
+                        }
+                        else
+                        {
+                            for (int allSellIdx = 0; allSellIdx < nHoldingCnt; allSellIdx++)
+                            {
+                                int nSellReqResult = axKHOpenAPI1.SendOrder("시간초과매도", SetTradeScreenNo(), sAccountNum, 2, holdingsArray[allSellIdx].sCode, holdingsArray[allSellIdx].nNumPossibleToSell, 0, "03", "");
+
+                                if (nSellReqResult != 0) // 요청이 성공하지 않으면
+                                {
+                                    testTextBox.AppendText(holdingsArray[allSellIdx].sCode + " 매도신청 전송 실패 \r\n"); //++
+
+                                }
+                                else
+                                {
+                                    nCurIdx = eachStockIdxArray[int.Parse(holdingsArray[allSellIdx].sCode)];
+                                    ea[nCurIdx].nSellReqCnt++;
+                                    testTextBox.AppendText((allSellIdx + 1).ToString() + " " + holdingsArray[allSellIdx].sCode + " 매도신청 전송 성공 \r\n"); //++
+                                }
+                                Delay(300); // 1초에 5번 제한이지만 혹시 모르니 1초에 3번정도로 제한으로
+                            }
+                        }
+                    }
+                }
+            } // END ---- e.sRQName.Equals("계좌평가잔고내역요청")
+
+            else if (e.sRQName.Equals("당일실현손익상세요청"))
+            {
+                int nTodayResult = int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "당일실현손익"));
+                testTextBox.AppendText("당일실현손익 : " + nTodayResult.ToString() + "(원) \r\n"); //++
+                int rows = axKHOpenAPI1.GetRepeatCnt(e.sTrCode, e.sRecordName);
+
+                string sCode;
+                string sCodeName;
+                int nTradeVolume;
+                double fBuyPrice;
+                int nTradePrice;
+                double fYield;
+
+                for (int todayProfitIdx = 0; todayProfitIdx < rows; todayProfitIdx++)
+                {
+                    sCode = axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, todayProfitIdx, "종목코드").Trim().Substring(1);
+                    sCodeName = axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, todayProfitIdx, "종목명").Trim();
+                    fYield = double.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, todayProfitIdx, "손익율"));
+                    nTradeVolume = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, todayProfitIdx, "체결량")));
+                    fBuyPrice = Math.Abs(double.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, todayProfitIdx, "매입단가")));
+                    nTradePrice = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, todayProfitIdx, "체결가")));
+
+                    testTextBox.AppendText("종목명 : " + sCodeName + ", 종목코드 : " + sCode + ", 체결량 : " + nTradeVolume.ToString() + ", 매입단가 : " + fBuyPrice.ToString() + ", 체결가 : " + nTradePrice.ToString() + ", 손익율 : " + fYield.ToString() + "(%) \r\n"); //++
+                }
+            } // END ---- e.sRQName.Equals("당일실현손익상세요청")
+            else if (e.sRQName.Equals("주식기본정보요청"))
+            {
+                int nCodeIdx = int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "종목코드"));
+                nCurIdx = eachStockIdxArray[nCodeIdx];
+
+                ea[nCurIdx].sCodeName = axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "종목명").Trim();
+                try
+                {
+                    ea[nCurIdx].lShareOutstanding = long.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "유통주식")) * 1000;
+                    ea[nCurIdx].lTotalNumOfStock = long.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "상장주식")) * 1000; ;
+                    ea[nCurIdx].nYesterdayEndPrice = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "현재가")));
+                }
+                catch (Exception ex)
+                {
+                    ea[nCurIdx].lShareOutstanding = long.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "상장주식")) * 1000;
+                    ea[nCurIdx].lTotalNumOfStock = ea[nCurIdx].lShareOutstanding;
+                    ea[nCurIdx].nYesterdayEndPrice = Math.Abs(int.Parse(axKHOpenAPI1.GetCommData(e.sTrCode, e.sRecordName, 0, "현재가")));
+                }
+               
+                StreamWriter tmpSw = new StreamWriter(new FileStream(sBasicInfoPath + ea[nCurIdx].sCode + ".txt", FileMode.Create));
+                tmpSw.Write(ea[nCurIdx].sCodeName + "," + ea[nCurIdx].lShareOutstanding.ToString() + "," + ea[nCurIdx].lTotalNumOfStock.ToString() + "," + ea[nCurIdx].nYesterdayEndPrice.ToString());
+                tmpSw.Close();
+            }
+
+        } // END ---- TR 이벤트 핸들러
+
+
+
+
+        // ============================================
+        // 실시간 이벤트발생시 핸들러메소드 
+        // ============================================
+        private void OnReceiveRealDataHandler(object sender, AxKHOpenAPILib._DKHOpenAPIEvents_OnReceiveRealDataEvent e)
+        {
+            string sCode = e.sRealKey;
+
+            if (tradeQueue.Count > 0) // START ---- 매매컨트롤러
+            {
+                
+                if (isForbidTrade) // 거래정지상태
+                {
+                    dtCurOrderTime = DateTime.Now;
+                    if ((dtCurOrderTime - dtBeforeOrderTime).Seconds >= 1) // 1초가 지나면 거래 풀어줌.
+                    {
+                        isForbidTrade = false;
+                        dtBeforeOrderTime = dtCurOrderTime;
+                        nReqestCount = 0;
+                    }
+                }
+
+                if (!isForbidTrade)  // 거래정지가 아니라면
+                {
+                    curSlot = tradeQueue.Dequeue(); // 우선 디큐한다
+                    if (SubTimeToTimeAndSec(nSharedTime, curSlot.nRqTime) <= IGNORE_REQ_SEC) // 현재시간 - 요청시간 < 10초 : 요청시간이 너무 길어진 요청의 처리를 위한 분기문  
+                    {
+
+                        if (curSlot.nOrderType <= NEW_SELL) // 신규매수매도 신규매수:1 신규매도:2
+                        {
+                            // 아직 매수중이거나 매도중일때는
+                            if ((ea[curSlot.nEachStockIdx].nBuyReqCnt > 0) || (ea[curSlot.nEachStockIdx].nSellReqCnt > 0)) // 현재 거래중이면
+                            {
+                                tradeQueue.Enqueue(curSlot); // 디큐했던 슬롯을 다시 인큐한다.
+                            }
+                            else // 거래중이 아닐때 (단, 매수취소는 예외)
+                            {
+                                if (curSlot.nOrderType == NEW_BUY) // 신규매수
+                                {
+                                    int nEstimatedPrice = curSlot.nOrderPrice; // 종목의 요청했던 최우선매도호가를 받아온다.
+                                                                               // 반복해서 가격을 n칸 올린다.
+                                    if (ea[curSlot.nEachStockIdx].nMarketGubun == KOSDAQ_ID) // 코스닥일 경우
+                                    {
+                                        for (int eyeCloseIdx = 0; eyeCloseIdx < EYES_CLOSE_NUM; eyeCloseIdx++)
+                                            nEstimatedPrice += GetKosdaqGap(nEstimatedPrice);
+                                    }
+                                    else if (ea[curSlot.nEachStockIdx].nMarketGubun == KOSPI_ID) // 코스피의 경우
+                                    {
+                                        for (int eyeCloseIdx = 0; eyeCloseIdx < EYES_CLOSE_NUM; eyeCloseIdx++)
+                                            nEstimatedPrice += GetKospiGap(nEstimatedPrice);
+                                    }
+
+                                    double fCurLimitPriceFee = (nEstimatedPrice * (1 + VIRTUAL_STOCK_FEE));
+
+                                    int nNumToBuy = (int)(nCurDepositCalc / fCurLimitPriceFee); // 현재 예수금으로 살 수 있을 만큼
+                                    int nMaxNumToBuy = (int)(nMaxPriceForEachStock / fCurLimitPriceFee); // 최대매수가능금액으로 살 수 있을 만큼
+
+                                    if (nNumToBuy > nMaxNumToBuy) // 최대매수가능수를 넘는다면
+                                        nNumToBuy = nMaxNumToBuy; // 최대매수가능수로 세팅
+
+                                    // 구매수량이 있고 현재종목의 최우선매도호가가 요청하려는 지정가보다 낮을 경우 구매요청을 걸 수 있다.
+                                    if ((nNumToBuy > 0) && (ea[curSlot.nEachStockIdx].nFs < nEstimatedPrice))
+                                    {
+                                        if (curSlot.sHogaGb.Equals("03")) // 시장가모드 : 시장가로 하면 키움에서 상한가값으로 계산해서 예수금만큼 살 수 가 없다
+                                        {
+                                            if (buySlotCntArray[curSlot.nEachStockIdx] < BUY_LIMIT_NUM) // 개인 구매횟수를 넘기지 않았다면
+                                            {
+                                                ea[curSlot.nEachStockIdx].nCurLimitPrice = nEstimatedPrice; // 지정상한가 설정
+                                                ea[curSlot.nEachStockIdx].fTargetPercent = curSlot.fTargetPercent; // 익절퍼센트 설정
+                                                ea[curSlot.nEachStockIdx].fBottomPercent = curSlot.fBottomPercent; // 손절퍼센트 설정
+                                                ea[curSlot.nEachStockIdx].nCurRqTime = nSharedTime; // 현재시간설정
+
+                                                testTextBox.AppendText(ea[curSlot.nEachStockIdx].nCurRqTime.ToString() + " : " + curSlot.sCode + " 매수신청 전송 \r\n"); //++
+                                                int nBuyReqResult = axKHOpenAPI1.SendOrder(curSlot.sRQName, SetTradeScreenNo(), sAccountNum,
+                                                    curSlot.nOrderType, curSlot.sCode, nNumToBuy, nEstimatedPrice,
+                                                    "00", curSlot.sOrgOrderId); // 높은 매도호가에 지정가로 걸어 시장가처럼 사게 한다
+                                                                                // 최우선매도호가보다 높은 가격에 지정가를 걸면 현재매도호가에 구매하게 된다.
+                                                isSendOrder = true;
+                                                if (nBuyReqResult == 0) // 요청이 성공하면
+                                                {
+                                                    ea[curSlot.nEachStockIdx].nBuyReqCnt++; // 구매횟수 증가
+                                                    testTextBox.AppendText(curSlot.sCode + " 매수신청 전송 성공 \r\n"); //++
+                                                }
+                                            }
+                                            else  // 개인 구매횟수를 넘겼다면
+                                                testTextBox.AppendText(curSlot.sCode + " 종목의 구매횟수를 초과했습니다.\r\n"); //++
+                                        }
+                                    }
+                                } // END ---- 신규매수
+                                else if (curSlot.nOrderType == NEW_SELL) // 신규매도
+                                {
+                                    if (curSlot.sHogaGb.Equals("03")) // 시장가매도
+                                    {
+                                        ea[curSlot.nEachStockIdx].nCurRqTime = nSharedTime; // 현재시간설정
+
+                                        testTextBox.AppendText(nSharedTime.ToString() + " : " + curSlot.sCode + " 매도신청 전송 \r\n"); //++
+                                        int nSellReqResult = axKHOpenAPI1.SendOrder(curSlot.sRQName, SetTradeScreenNo(), sAccountNum,
+                                                curSlot.nOrderType, curSlot.sCode, curSlot.nQty, 0,
+                                                curSlot.sHogaGb, curSlot.sOrgOrderId);
+                                        isSendOrder = true;
+                                        if (nSellReqResult != 0) // 요청이 성공하지 않으면
+                                        {
+                                            testTextBox.AppendText(curSlot.sCode + " 매도신청 전송 실패 \r\n"); //++
+                                            buySlotArray[curSlot.nEachStockIdx, curSlot.nBuySlotIdx].isSelled = false; // 요청실패일때 다시 요청하기 위해
+                                                                                                                       // 해당 buySlot에서 판매완료시그널을 false로 세팅해준다
+                                                                                                                       // 이 작업을 하기 위해서 TradeSlot 구조체에 nBuySlotIdx 변수가 필요한것이다.
+                                        }
+                                        else
+                                        {
+                                            testTextBox.AppendText(curSlot.sCode + " 매도신청 전송 성공 \r\n"); //++
+                                            ea[curSlot.nEachStockIdx].nSellReqCnt++; // 매도요청전송이 성공하면 매도횟수를 증가한다.
+                                        }
+                                    }
+                                } // END ---- 신규매도
+                            }
+                        } // End ---- 신규매수매도
+                        else if (curSlot.nOrderType == 3) // 매수취소 매수취소는 매수중일때만 요청되고 매수와 함께 슬롯입장이 가능하다. 매도중일때는 안된다.
+                        {
+                            // 구매중일때만 매수취소가 가능하니 buySlotArray의 인덱스는 매수취소종목의 마지막인덱스로 확정되니
+                            // 건들지 않는다
+
+                            testTextBox.AppendText(nSharedTime.ToString() + " : " + curSlot.sCode + " 매수취소신청 전송 \r\n"); //++
+                            int nCancelReqResult = axKHOpenAPI1.SendOrder(curSlot.sRQName, SetTradeScreenNo(), sAccountNum,
+                                curSlot.nOrderType, curSlot.sCode, 0, 0,
+                                "", curSlot.sOrgOrderId);
+                            isSendOrder = true;
+                            if (nCancelReqResult != 0) // 매수취소가 성공하지 않으면
+                            {
+                                ea[curSlot.nEachStockIdx].isCancelMode = false; // 해당종목의 현재 매수취소시그널을 false한다
+                                                                                // 이래야지 매수취소를 다시 신청할 수 있다.
+                            }
+                            else
+                            {
+                                testTextBox.AppendText(curSlot.sCode + " 매수취소신청 전송 성공 \r\n"); //++
+                            }
+                        } // End ---- 매수취소
+
+
+                        if (isSendOrder) // 주문을 요청했을때만
+                        {
+                            isSendOrder = false;
+                            dtCurOrderTime = DateTime.Now;
+                            if ((dtCurOrderTime - dtBeforeOrderTime).Seconds >= 1) // 주문시간이 이전주문시간과 다르다 == 1초 제한이 아니다
+                            {
+                                dtBeforeOrderTime = dtCurOrderTime;
+                                nReqestCount = 1;
+                            }
+                            else  // 주문시간이 이전시간과 같다 == 1초 제한 카운트 증가
+                            {
+                                nReqestCount++;
+                                if (nReqestCount >= (LIMIT_SENDORDER_NUM - 1)) // 5번제한이지만 혹시 모르니 4번제한으로
+                                {
+                                    isForbidTrade = true; // 제한에 걸리면 1초가 지날때까지는 매매 금지
+                                }
+                            }
+                        } // END ---- 주문을 요청했을때만
+                        else
+                        {
+                            if (curSlot.nOrderType == NEW_SELL) // 매도신청은 버려져서는 안됨.
+                            {
+                                buySlotArray[curSlot.nEachStockIdx, curSlot.nBuySlotIdx].isSelled = false;
+                            }
+                        }
+
+                    } // End ---- 현재시간 - 요청시간 < 10초
+
+                } // END ---- 거래정지가 아니라면
+            } // END ---- 매매컨트롤러
+
+
+            if (e.sRealType.Equals("주식호가잔량")) // ##호가##
+            {
+                int nCodeIdx = int.Parse(sCode);
+                nCurIdx = eachStockIdxArray[nCodeIdx];
+
+                if (isMarketStart && !ea[nCurIdx].isExcluded)
+                {
+
+                    try
+                    {
+                        int s4 = int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 64)); // 매도4호가잔량
+                        int b4 = int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 74)); // 매수4호가잔량
+
+                        if (s4 == 0 && b4 == 0)
+                            ea[nCurIdx].isViMode = true;
+                        else
+                            if (ea[nCurIdx].isViMode)
+                                ea[nCurIdx].isViMode = false;
+
+                    }
+                    catch (Exception ex)
+                    {
+
+                    }
+
+
+                    if (!ea[nCurIdx].isViMode)
+                    {
+                        try
+                        {
+                            ea[nCurIdx].nTotalBuyHogaVolume = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 125)));  // 매수호가총잔량
+                        }
+                        catch (Exception ex)
+                        {
+                            ea[nCurIdx].nTotalBuyHogaVolume = 0;
+                        }
+                        try
+                        {
+                            ea[nCurIdx].nTotalSellHogaVolume = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 121)));  // 매도호가총잔량
+                        }
+                        catch (Exception ex)
+                        {
+                            ea[nCurIdx].nTotalSellHogaVolume = 0;
+                        }
+
+                        ea[nCurIdx].nTotalHogaVolume = ea[nCurIdx].nTotalBuyHogaVolume + ea[nCurIdx].nTotalSellHogaVolume;
+
+                       
+                    }
+                }
+            }
+            else if (e.sRealType.Equals("주식체결")) // ##체결##
+            {
+
+                nSharedTime = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 20))); // 현재시간
+                int nCodeIdx = int.Parse(sCode);
+                nCurIdx = eachStockIdxArray[nCodeIdx];
+
+                if (nFirstTime == 0)
+                    nFirstTime = nSharedTime;
+
+                if (isMarketStart && !ea[nCurIdx].isExcluded) // 장이 시작 안했으면 접근 금지
+                {
+
+
+                    //if (nSharedTime >= SHUTDOWN_TIME) // 3시가 넘었으면
+                    //{
+                    //    testTextBox.AppendText("3시가 지났다\r\n");
+                    //    nShutDown++; // 장이 끝남을 알린다 (nShutDown이 0일때는 전량매도작업을 수행하지 않기 때문에)
+                    //    isMarketStart = false; // 장 중 시그널을 off한다
+                    //    for (int nScreenNum = REAL_SCREEN_NUM_START; nScreenNum <= REAL_SCREEN_NUM_END; nScreenNum++)
+                    //    {
+                    //        // 실시간 체결에 할당된 화면번호들에 대해 다 디스커넥트한다
+                    //        // 실시간 체결만 받고있는 화면번호들만이 아니라 전부를 디스커넥트하는 이유는
+                    //        // 전부를 디스커넥트하는 잠깐의 시간동안 잔여 실시간주식체결데이터들이 처리되는 것을 기다리는 기능도 있다.
+                    //        axKHOpenAPI1.DisconnectRealData(nScreenNum.ToString());
+                    //    }
+
+                    //    RequestHoldings(0); // 잔고현황을 체크한다. 이때 nShutDown이 양수이기 때문에 남아있는 주식들이 있으면 전량 매도한다.
+                    //    return;
+                    //}
+
+                    try
+                    {
+                        ea[nCurIdx].nFs = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 27))); // 최우선매도호가
+                        ea[nCurIdx].nFb = Math.Abs(int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 28))); // 최우선매수호가
+                        ea[nCurIdx].nTv = int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 15)); // 거래량
+                        ea[nCurIdx].fTs = double.Parse(axKHOpenAPI1.GetCommRealData(sCode, 228)); // 체결강도
+                        ea[nCurIdx].fPower = double.Parse(axKHOpenAPI1.GetCommRealData(sCode, 12)) / 100; // 등락율
+                    }
+                    catch (Exception ex)
+                    {
+                        return;
+                    }
+
+                    ea[nCurIdx].nCnt++; // 인덱스를 올린다.
+
+                    if (ea[nCurIdx].nFs == 0 && ea[nCurIdx].nFb == 0)  // 둘 다 데이터가 없는경우는 가격초기화가 불가능하기 return
+                        return;
+                    else
+                    {
+                        // 둘다 제대로 받아졌거나 , 둘 중 하나가 안받아졌거나
+                        if (ea[nCurIdx].nFs == 0) // fs가 안받아졌으면 fb 가격에 fb갭 한칸을 더해서 설정
+                        {
+                            int gap = 0;
+                            if (ea[nCurIdx].nMarketGubun == KOSDAQ_ID)
+                                gap = GetKosdaqGap(ea[nCurIdx].nFb);
+                            else if (ea[nCurIdx].nMarketGubun == KOSPI_ID)
+                                gap = GetKospiGap(ea[nCurIdx].nFb);
+
+                            ea[nCurIdx].nFs = ea[nCurIdx].nFb + gap;
+                        }
+                        if (ea[nCurIdx].nFb == 0) // fb가 안받아졌으면 fs 가격에 (fs-1)갭 한칸을 마이너스해서 설정
+                        {
+                            // fs-1 인 이유는 fs가 1000원이라하면 fb는 999여야하는데 갭을 받을때 5를 받게되니 fb가 995가 되어버린다.이는 오류!
+                            int gap = 0;
+                            if (ea[nCurIdx].nMarketGubun == KOSDAQ_ID)
+                                gap = GetKosdaqGap(ea[nCurIdx].nFs - 1);
+                            else if (ea[nCurIdx].nMarketGubun == KOSPI_ID)
+                                gap = GetKospiGap(ea[nCurIdx].nFs - 1);
+
+                            ea[nCurIdx].nFb = ea[nCurIdx].nFs - gap;
+                        }
+
+                    }
+                    ea[nCurIdx].nDiff = ea[nCurIdx].nFs - ea[nCurIdx].nFb;
+
+                    // 이상 데이터 감지
+                    // fs와 fb의 가격차이가 2퍼가 넘을경우 이상데이터라 생각하고 리턴한다.
+                    // 미리 리턴하는 이유는 이런 이상 데이터로는 전략에 사용하지 않기위해서 전략찾는 부분 위에서 리턴여부를 검증한다.
+                    // if ((ea[nCurIdx].nFs - ea[nCurIdx].nFb) / ea[nCurIdx].nFb > 0.02)
+                    //    return;
+
+
+
+
+
+                    // 처음가격과 시간등을 맞추려는 변수이다.
+                    if (!ea[nCurIdx].isFirstCheck) // 개인 초기작업
+                    {
+
+                        //if (ea[nCurIdx].nFs < 1000) // 1000원도 안한다면 폐기처분
+                        //{
+                        //    axKHOpenAPI1.SetRealRemove(ea[nCurIdx].sRealScreenNum, ea[nCurIdx].sCode);
+                        //    ea[nCurIdx].isExcluded = true;
+                        //}
+
+                        ea[nCurIdx].isFirstCheck = true; // 가격설정이 끝났으면 이종목의 초기체크는 완료 설정
+                        int nStartGap = int.Parse(axKHOpenAPI1.GetCommRealData(sCode, 11)); // 어제종가와 비교한 가격변화
+
+                        ea[nCurIdx].nStartGap = nStartGap; // 갭
+
+                        if (ea[nCurIdx].nYesterdayEndPrice == 0)
+                        {
+                            ea[nCurIdx].nYesterdayEndPrice = ea[nCurIdx].nFs - nStartGap; // 시초가에서 변화를 제거하면 어제 종가가 나옴
+                            ea[nCurIdx].nTodayStartPrice = ea[nCurIdx].nFs; // 오늘 시초가
+                        }
+                        else
+                        {
+                            ea[nCurIdx].nTodayStartPrice = ea[nCurIdx].nYesterdayEndPrice + ea[nCurIdx].nStartGap;
+                        }
+                        ea[nCurIdx].fStartGap = (double)ea[nCurIdx].nStartGap / ea[nCurIdx].nYesterdayEndPrice; // 갭의 등락율
+                        
+                    } // END ---- 개인 초기작업
+
+
+                    if (ea[nCurIdx].nCnt == 1)  // 첫데이터는  tv가 너무 높을 수 있느니 패스
+                        return;
+
+
+
+
+
+
+
+
+
+                   
+                    
+                    ////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////
+                    ///////////// 점수 Part /////////////////////////////////////////////
+
+                    // 일정시간마다 fJar 값을 감소시킨다. 이 일정시간을 어떻게 매길것인 지는 고민해볼 문제
+                    // 시간 당 ... 
+                    int nTimeUpdate = SubTimeToTimeAndSec(nSharedTime, ea[nCurIdx].nPrevSpeedUpdateTime) / nUpdateTime;
+                    for (int idxUpdate = 0; idxUpdate < nTimeUpdate; idxUpdate++)
+                    {
+                        // 스피드 업데이트
+                        if (ea[nCurIdx].fSpeedVal == 0) // 초기 데이터의 경우
+                            ea[nCurIdx].fSpeedVal = ea[nCurIdx].nSpeedPush;
+                        else 
+                            ea[nCurIdx].fSpeedVal = ea[nCurIdx].nSpeedPush * fPushWeight + ea[nCurIdx].fSpeedVal * (1 - fPushWeight);
+
+                        ea[nCurIdx].nSpeedPush = 0; // 속도푸쉬 초기화
+                        ea[nCurIdx].nPrevSpeedUpdateTime = nSharedTime; // 업데이트시간 초기화 
+
+                        // 엄격한 방법의 업데이트시간 초기화
+                        // ex) nUpdateTime = 20, nTimeUpdate = 38, nPrevSpeedUpdateTime = 0
+                        // nPrevSpeedUpdateTime = 20 다음 update까지 2(40 - 38)초 남았음
+                        // ea[nCurIdx].nPrevSpeedUpdateTime = AddTimeBySec(ea[nCurIdx].nPrevSpeedUpdateTime, nUpdateTime);
+                    }
+
+
+                    // 가격은 매초당 조금씩 줄여나가게 한다
+                    // 1분이 지났을 시 0.547퍼센트
+                    int nTimeGap = SubTimeToTimeAndSec(nSharedTime, ea[nCurIdx].nPrevPowerUpdateTime);
+                    for (int idxTimeGap = 0; idxTimeGap < nTimeGap; idxTimeGap++)
+                    {
+                        // 가격변화 업데이트
+                        ea[nCurIdx].fPowerJar *= 0.995;
+                        ea[nCurIdx].fPlusCnt07 *= 0.7;
+                        ea[nCurIdx].fMinusCnt07 *= 0.7;
+                        ea[nCurIdx].fPlusCnt09 *= 0.9;
+                        ea[nCurIdx].fMinusCnt09 *= 0.9;
+
+
+                        ea[nCurIdx].nPrevPowerUpdateTime = nSharedTime;
+                    }
+
+                    // 파워는 최우선매수호가와 초기가격의 손익률로 계산한다
+                    ea[nCurIdx].fPowerWithoutGap = ea[nCurIdx].fPower - ea[nCurIdx].fStartGap;
+
+
+                    int nTimePassed = SubTimeToTimeAndSec(nSharedTime, ea[nCurIdx].nPrevSpeedUpdateTime); // 지난시간 = 현재시간 - 이전시간 
+                    double fTimePassedWeight = (double)nTimePassed / nUpdateTime; // 업데이트한 지 얼마 안됐을경우 지난시간이 지극히 낮고 nSpeedPush는 0에 가까울 것이다.
+                    double fTimePassedPushWeight = fTimePassedWeight * fPushWeight; // fPushWeight에서 지난시간의 크기만큼만 곱해 현재정보(nSpeedPush) 적용
+
+
+
+                    //  속도 실시간 처리
+                    ea[nCurIdx].nSpeedPush++;
+                    if (ea[nCurIdx].fSpeedVal == 0)
+                        ea[nCurIdx].fCurSpeed = (double)ea[nCurIdx].nSpeedPush / nUpdateTime;
+                    else 
+                        ea[nCurIdx].fCurSpeed = (ea[nCurIdx].nSpeedPush * fTimePassedPushWeight + ea[nCurIdx].fSpeedVal * (1 - fTimePassedPushWeight)) / nUpdateTime; 
+
+
+
+                    double fPowerDiff = ea[nCurIdx].fPowerWithoutGap - ea[nCurIdx].fPrevPowerWithoutGap;
+
+                    // 가격변화 실시간 처리
+                    ea[nCurIdx].fPowerJar += fPowerDiff;
+
+                    if (fPowerDiff > 0)
+                    {
+                        ea[nCurIdx].fPlusCnt07++;
+                        ea[nCurIdx].fPlusCnt09++;
+                    }
+                    else if( fPowerDiff < 0)
+                    {
+                        ea[nCurIdx].fMinusCnt07++;
+                        ea[nCurIdx].fMinusCnt09++;
+                    }
+                    
+                    ea[nCurIdx].fPrevPowerWithoutGap = ea[nCurIdx].fPowerWithoutGap;
+
+                   
+                    
+
+
+
+
+
+                    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                    // 현재 거래중이고(nBuyReqCnt > 0) 현재 매수취소가 가능한 상태라면 접근 가능
+                    if (ea[nCurIdx].isOrderStatus)
+                    {
+                        if ((ea[nCurIdx].nBuyReqCnt > 0) && !ea[nCurIdx].isCancelMode) // 미체결량이 남아있다면
+                        {
+                            // 현재 최우선매도호가가 지정상한가를 넘었거나 매매 요청시간과 현재시간이 너무 오래 차이난다면(= 매수가 너무 오래걸린다 = 거래량이 낮고 머 별거 없다)
+                            if ((ea[nCurIdx].nFs > ea[nCurIdx].nCurLimitPrice) || (SubTimeToTimeAndSec(nSharedTime, ea[nCurIdx].nCurRqTime) >= MAX_REQ_SEC)) // 지정가를 초과하거나 오래걸린다면
+                            {
+                                curSlot.sRQName = "매수취소";
+                                curSlot.nOrderType = 3; // 매수취소
+                                curSlot.sCode = sCode;
+                                curSlot.sOrgOrderId = ea[nCurIdx].sCurOrgOrderId; // 현재 매수의 원주문번호를 넣어준다.
+                                curSlot.nRqTime = nSharedTime; // 현재시간설정
+
+                                tradeQueue.Enqueue(curSlot); // 매매신청큐에 인큐
+
+                                ea[nCurIdx].isCancelMode = true; // 현재 매수취소 불가능상태로 만든다
+                                testTextBox.AppendText(nSharedTime.ToString() + " : " + sCode + " 매수취소신청 \r\n"); //++
+                            }
+                        }
+                    }
+
+
+                    int nBuySlotIdx = buySlotCntArray[nCurIdx]; // 현재 종목의 매수 record수를 체크
+                                                                // 한번의 레코드 신청이 있다하더라도 매수가 완료된 시점에 ++하기 떄문에
+                                                                // 처음에는 0일테고 하나의 거래가 완료되면 1이 되니 그때부터 for문에서 접근 가능
+                    if (nBuySlotIdx > 0) // 보유종목이 있다면
+                    {
+                        int nBuyPrice;
+                        double fYield;
+
+                        for (int checkSellIterIdx = 0; checkSellIterIdx < nBuySlotIdx; checkSellIterIdx++) // 반복적 확인
+                        {
+                            // 그리고 !isSelled 아직 판매완료가 안됐을때 접근 가능
+                            if (!buySlotArray[nCurIdx, checkSellIterIdx].isSelled)
+                            {
+                                bool isSell = false;
+
+                                nBuyPrice = buySlotArray[nCurIdx, checkSellIterIdx].nBuyPrice; // 처음 초기화됐을때는 0인데 체결이 된 상태에서만 접근 가능하니 사졌을 때의 평균매입가
+                                fYield = (ea[nCurIdx].nFb - nBuyPrice) / nBuyPrice; // 현재 최우선매수호가 와의 손익률을 구한다
+                                fYield -= STOCK_TAX + STOCK_FEE + STOCK_FEE; // 거래세와 거래수수료 차감
+
+                                if (fYield >= buySlotArray[nCurIdx, checkSellIterIdx].fTargetPer) // 손익률이 익절퍼센트를 넘기면
+                                {
+                                    isSell = true;
+                                    curSlot.sRQName = "익절매도";
+                                    testTextBox.AppendText(nSharedTime.ToString() + " : " + sCode + " 익절매도신청 \r\n"); //++
+                                }
+                                else if (fYield <= buySlotArray[nCurIdx, checkSellIterIdx].fBottomPer) // 손익률이 손절퍼센트보다 낮으면
+                                {
+                                    isSell = true;
+                                    curSlot.sRQName = "손절매도";
+                                    testTextBox.AppendText(nSharedTime.ToString() + " : " + sCode + " 손절매도신청 \r\n"); //++
+                                }
+
+                                if (isSell)
+                                {
+                                    curSlot.nOrderType = NEW_SELL; // 신규매도
+                                    curSlot.sCode = sCode;
+                                    curSlot.nQty = buySlotArray[nCurIdx, checkSellIterIdx].nBuyVolume; // 이 레코드에 있는 전량을 판매한다
+                                    curSlot.sHogaGb = "03";
+                                    curSlot.sOrgOrderId = "";
+                                    curSlot.nBuySlotIdx = checkSellIterIdx; // 나중에 요청전송이 실패할때 다시 취소하기 위해 적어놓는 변수
+                                    curSlot.nEachStockIdx = nCurIdx; // 현재 종목의 인덱스
+                                    curSlot.nRqTime = nSharedTime; // 현재시간 설정
+
+                                    tradeQueue.Enqueue(curSlot); // 매매요청큐에 인큐한다
+                                    buySlotArray[nCurIdx, checkSellIterIdx].isSelled = true; // 현재 거래레코드는 판매완료됐다, 요청전송 실패됐을때는 다시 false로 설정된다.
+
+                                }
+                            }
+                        } // END ---- 반복적 확인 종료
+                    } // END ---- 보유종목이 있다면
+
+
+
+
+
+
+
+
+
+                }
+            }// End ---- e.sRealType.Equals("주식체결")
+            else if (e.sRealType.Equals("장시작시간"))
+            {
+
+                string sGubun = axKHOpenAPI1.GetCommRealData(e.sRealKey, 215); // 장운영구분 0 :장시작전, 3 : 장중, 4 : 장종료
+                string sTime = axKHOpenAPI1.GetCommRealData(e.sRealKey, 20); // 체결시간
+                string sTimeRest = axKHOpenAPI1.GetCommRealData(e.sRealKey, 214); // 잔여시간
+                if (sGubun.Equals("0")) // 장시작 전
+                {
+                    testTextBox.AppendText(sTimeRest.ToString() + " : 장시작전\r\n"); ;//++
+                }
+                else if (sGubun.Equals("3")) // 장 중
+                {
+                    testTextBox.AppendText("장중\r\n");//++
+                    isMarketStart = true;
+                    nFirstTime = int.Parse(sTime);
+                    nFirstTime -= nFirstTime % 10000;
+
+                    RequestHoldings(0); // 장시작하고 잔여종목 전량매도
+                }
+                else
+                {
+                    if (sGubun.Equals("2")) // 장 종료 10분전 동시호가
+                    {
+                        testTextBox.AppendText(sTimeRest.ToString() + " : 장종료전\r\n");//++
+                        isMarketStart = false;
+                        nShutDown++;
+                        RequestHoldings(0); // 장 끝나기 전 잔여종목 전량매도
+                    }
+                    else if (sGubun.Equals("4")) // 장 종료
+                    {
+                        testTextBox.AppendText("장종료\r\n");//++
+                        isMarketStart = false;
+                        nShutDown++;
+                        isForCheckHoldings = true;
+                        RequestHoldings(0);
+                        RequestTradeResult();
+
+                    }
+                }
+
+            } // End ---- e.sRealType.Equals("장시작시간")
+        }
+
+
+        // ==================================================
+        // 주식주문(접수, 체결, 잔고) 이벤트발생시 핸들러메소드
+        // ==================================================
+        private void OnReceiveChejanDataHandler(object sender, AxKHOpenAPILib._DKHOpenAPIEvents_OnReceiveChejanDataEvent e)
+        {
+            if (e.sGubun.Equals("0")) // 접수와 체결 
+            {
+
+                string sTradeTime = axKHOpenAPI1.GetChejanData(908); // 체결시간
+                nSharedTime = Math.Abs(int.Parse(sTradeTime));
+
+                string sCode = axKHOpenAPI1.GetChejanData(9001).Substring(1); // 종목코드
+                int nCodeIdx = int.Parse(sCode);
+                nCurIdx = eachStockIdxArray[nCodeIdx];
+                int nCurBuySlotIdx = buySlotCntArray[nCurIdx];
+
+                string sOrderType = axKHOpenAPI1.GetChejanData(905).Trim(charsToTrim); // +매수, -매도, 매수취소
+                string sOrderStatus = axKHOpenAPI1.GetChejanData(913).Trim(); // 주문상태(접수, 체결, 확인)
+                string sOrderId = axKHOpenAPI1.GetChejanData(9203).Trim(); // 주문번호
+                int nOrderVolume = Math.Abs(int.Parse(axKHOpenAPI1.GetChejanData(900))); // 주문수량
+                string sCurOkTradePrice = axKHOpenAPI1.GetChejanData(914).Trim(); // 단위체결가 없을땐 ""
+                string sCurOkTradeVolume = axKHOpenAPI1.GetChejanData(915).Trim(); // 단위체결량 없을땐 ""
+                int nNoTradeVolume = Math.Abs(int.Parse(axKHOpenAPI1.GetChejanData(902))); // 미체결량
+
+                //string sOkTradePrice = axKHOpenAPI1.GetChejanData(910).Trim(); // 체결가 없을땐 ""
+                //string sOkTradeVolume = axKHOpenAPI1.GetChejanData(911).Trim(); // 체결량 없을땐 ""
+
+                // ---------------------------------------------
+                // 매수 데이터 수신 순서
+                // 매수접수 - 매수체결
+                // 매수접수 - (매수취소) - 매수체결
+                // 매수접수 - (매수취소) - 매수취소접수 - 매수취소확인 - 매수접수(매수취소확인)
+                // 매수접수 - (매수취소) - 매수체결 - 매수취소접수 - 매수취소확인 - 매수체결(매수취소확인)
+                // ---------------------------------------------
+                if (sOrderType.Equals("매수"))
+                {
+
+                    if (sOrderStatus.Equals("체결"))
+                    {
+                        // 매수-체결됐으면 3가지로 나눠볼 수 있는데
+                        // 1. 일반적으로 일부 체결된 경우
+                        // 2. 전량 체결된 경우
+                        // 3. 일부 체결된 후 나머지는 매수취소된 경우(미체결 클리어를 위해 얻어지는 경우)
+
+
+                        // 문자열로 받아진 단위체결량과 단위체결가를 정수로 바꾸는 작업을 한다.
+                        // 접수나 취소 때는 체결가~ 종류는 "" 공백으로 받아지기 때문에
+                        // 정수 캐스팅을 하면 오류가 나기 때문이다
+                        int nCurOkTradeVolume;
+                        int nCurOkTradePrice;
+                        try
+                        {
+                            nCurOkTradeVolume = Math.Abs(int.Parse(sCurOkTradeVolume)); // n단위체결량
+                            nCurOkTradePrice = Math.Abs(int.Parse(sCurOkTradePrice)); // n단위체결가
+                        }
+                        catch (Exception ex)
+                        {
+                            // 혹시 문자열이 ""이라면 매수체결시 받아지는 체결 메시지다.
+                            ea[nCurIdx].isCancelComplete = false; // 매수취소완료버튼 초기화
+                            ea[nCurIdx].isCancelMode = false; // 해당종목의 현재매수취소버튼 초기화
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].isAllBuyed = true; // 해당종목의 매수레코드의 매수완료 on
+                            buySlotCntArray[nCurIdx]++; // 매수레코드 수 증가
+                            ea[nCurIdx].nBuyReqCnt--; // 매수요청 카운트 감소
+                            ea[nCurIdx].isOrderStatus = false; // 매매중 off
+                            return;
+                        }
+                        // 예수금에 지정상한가와 매입금액과의 차이만큼을 다시 복구시켜준다.
+                        nCurDepositCalc += (ea[nCurIdx].nCurLimitPrice - nCurOkTradePrice) * nCurOkTradeVolume; // 예수금에 (추정매수가 - 실매수가) * 실매수량 더해준다. //**
+
+                        // 이것은 현재매수 구간이기 떄문에
+                        // 해당레코드의 평균매입가와 매수수량을 조정하기 위한 과정이다
+                        int sum = buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyPrice * buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyVolume;
+                        sum += nCurOkTradePrice * nCurOkTradeVolume;
+                        buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyVolume += nCurOkTradeVolume;
+                        buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyPrice = sum / buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyVolume;
+
+                        if (nNoTradeVolume == 0) // 매수 전량 체결됐다면
+                        {
+                            // 매수가 전량 체결됐다면 
+                            // 체결-매수취소와 유사하게 진행된다 하나 다른점은 매수취소완료 시그널을 건들 필요가 없다는 것이다.
+                            // 현재매수취소 그리고 일부라도 체결됐으니 해당레코드에 구매됐다는 시그널을 on해주고 레코드인덱스를 한칸 늘린다
+                            // 매수요청 카운트도 낮추고 현재 매매중인 시그널을 off해준다.
+                            ea[nCurIdx].isCancelMode = false; // 매수취소를 했어도 취소접수가 안되면 그대로 전량체결이 되니까 이때 cancelMode를 false한다.
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].isAllBuyed = true; // 해당종목의 매수레코드의 매수완료 on
+                            buySlotCntArray[nCurIdx]++; // 매수레코드 수 증가
+                            ea[nCurIdx].nBuyReqCnt--; // 매수요청 카운트 감소
+                            ea[nCurIdx].isOrderStatus = false; // 매매중 off
+
+                            testTextBox.AppendText(sTradeTime + " : " + sCode + " 매수 체결완료 \r\n"); //++
+                        }
+                    } //  END ---- 매수체결 끝
+
+                    else if (sOrderStatus.Equals("접수"))
+                    {
+                        if (nNoTradeVolume == 0) // 전량 매수취소가 완료됐다면
+                        {
+                            // 접수-매수취소는
+                            // 체결이 하나도 안된상태에서 매수주문이 모두 매수취소 된 상황이다
+                            // 많은 설정을 할 필요가 없다
+                            // 여기서는 isAllBuyed와 현재레코드인덱스를 더하지 않는 이유는 체결데이터가 없기때문에
+                            // 굳이 인덱스를 늘려 레코드만 증가시킨다면 실시간에서 관리함에 시간이 더 소요되기 때문이다
+                            ea[nCurIdx].isCancelComplete = false; // 매수취소완료버튼 초기화
+                            ea[nCurIdx].isCancelMode = false; // 해당종목의 현재매수취소버튼 초기화
+                            ea[nCurIdx].nBuyReqCnt--; // 매수요청 카운트 감소
+                            ea[nCurIdx].isOrderStatus = false; // 매매중 off
+                        }
+                        else // 매수 주문인경우
+                        {
+                            // 원주문번호만 설정해준다.
+
+                            ea[nCurIdx].sCurOrgOrderId = sOrderId; // 현재원주문번호 설정
+                            ea[nCurIdx].isOrderStatus = true; // 매매중 on
+
+                            nCurDepositCalc -= (int)(nOrderVolume * ea[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)); // 예수금에서 매매수수료까지 포함해서 차감
+
+                            testTextBox.AppendText(sTradeTime + " : " + sCode + ", " + nOrderVolume.ToString() + "(주) 매수 접수완료 \r\n"); //++
+                                                                                                                                      //---------------------------------------------
+                                                                                                                                      // 구매기록 초기화
+                                                                                                                                      // --------------------------------------------
+                                                                                                                                      // 여기서 퍼센트는 매수,매도 시 curSlot에 설정하고
+                                                                                                                                      // 매매컨트롤러에서 eachStockArray에 설정하는 과정을 거쳐
+                                                                                                                                      // buySlotArray에 설정되는 과정으로 마쳐진다.
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].isSelled = false;
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].isAllBuyed = false;
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].fTargetPer = ea[nCurIdx].fTargetPercent;
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].fBottomPer = ea[nCurIdx].fBottomPercent;
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyPrice = 0;
+                            buySlotArray[nCurIdx, nCurBuySlotIdx].nBuyVolume = 0;
+                        }
+                    } // END ---- 매수접수끝
+                } // END ---- orderType.Equals("매수")
+                else if (sOrderType.Equals("매도"))
+                {
+                    if (sOrderStatus.Equals("체결"))
+                    {
+                        nCurDepositCalc += (int)(Math.Abs(int.Parse(sCurOkTradeVolume)) * Math.Abs(int.Parse(sCurOkTradePrice)) * (1 - (STOCK_TAX + VIRTUAL_STOCK_FEE))); //**
+
+                        if (nNoTradeVolume == 0)
+                        {
+                            if (ea[nCurIdx].nSellReqCnt > 0) //** 아침에 어제 매도 안된 애들이 남아있으면 sellReqCnt가 음수가 될 수 도 있으니 0이 넘어야만 차감되게끔 한다.
+                                ea[nCurIdx].nSellReqCnt--;
+
+                            ea[nCurIdx].isOrderStatus = false; // 매매중 off
+                            testTextBox.AppendText(sTradeTime + " : " + sCode + " 매도 체결완료 \r\n"); //++
+                        }
+                    }
+                    else if (sOrderStatus.Equals("접수"))
+                    {
+                        testTextBox.AppendText(sTradeTime + " : " + sCode + ", " + nOrderVolume.ToString() + "(주) 매도 접수완료 \r\n"); //++
+                        ea[nCurIdx].isOrderStatus = true; // 매매중 on
+                        ea[nCurIdx].sCurOrgOrderId = sOrderId; // 원주문번호
+                    }
+                } // END ---- orderType.Equals("매도")
+                else if (sOrderType.Equals("매수취소"))
+                {
+                    // ----------------------------------
+                    // 야기할 수 있는 문제
+                    // 1. 매수취소확인후 접수,체결을 안보내준다.
+                    // 2. 매수취소확인전에 접수,체결을 보내준다.
+                    // ----------------------------------
+
+                    // 매수취소에서는 매수취소완료버튼 on
+                    // 매수취소수량이 있으면 그만큼 예수금 더해주면 된다
+                    // 거래중, 매매완료 등등의 처리는 매수에서 완료한다.
+                    if (sOrderStatus.Equals("접수"))
+                    {
+                        testTextBox.AppendText(sTradeTime + " : " + sCode + ", " + nOrderVolume.ToString() + "(주) 매수취소 접수완료 \r\n"); //++
+                        // 매수취소 접수가 되면 거의 확정적으로 매수취소확인 따라오며 
+                        // 매수취소 접수때부터 이미 매수취소된거같음.
+                    }
+                    else if (sOrderStatus.Equals("확인"))
+                    {
+                        ea[nCurIdx].isCancelComplete = true; // 매수취소 완료
+
+                        // 매수취소확인은 사실상 매수취소 수량이 있는거고 미체결량은 0인 상태일 테지만 
+                        // 예기치 못한 오류로 인해 문제가 생길 수 도 있으니
+                        // 매수취소 수량과 미체결량을 검사해준다.
+                        if (nNoTradeVolume < nOrderVolume && nOrderVolume > 0) // 매수취소된 수량이 있다면
+                        {
+                            nCurDepositCalc += (int)((nOrderVolume - nNoTradeVolume) * (ea[nCurIdx].nCurLimitPrice * (1 + VIRTUAL_STOCK_FEE)));
+                        }
+
+                    }
+                } // END ---- orderType.Equals("매수취소")
+
+            } // End ---- e.sGubun.Equals("0") : 접수,체결
+
+            else if (e.sGubun.Equals("1")) // 잔고
+            {
+                string sCode = axKHOpenAPI1.GetChejanData(9001).Substring(1); // 종목코드
+                int nCodeIdx = Math.Abs(int.Parse(sCode));
+                nCurIdx = eachStockIdxArray[nCodeIdx];
+
+                int nHoldingQuant = Math.Abs(int.Parse(axKHOpenAPI1.GetChejanData(930))); // 보유수량
+                ea[nCurIdx].nHoldingsCnt = nHoldingQuant;
+            } // End ---- e.sGubun.Equals("1") : 잔고
+        }
+
+    }
+}
